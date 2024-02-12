@@ -1,7 +1,7 @@
 // 使用 await 和 async 实现批量转移收藏夹功能
 
 class ControlPanel {
-    constructor() {
+    constructor(favBtns) {
         this.delayTimeShort = 500;
         this.delayTimeMiddle = 1000;
         // 消息类型
@@ -14,40 +14,8 @@ class ControlPanel {
 
         this.onePageCode = 6;
 
-        // this.favLinks = this.getAllFavLinks(); // 调用 getAllFav的返回值获得所有链接，没有用到
-        this.favBtns = this.getAllFavBtns(); // 调用 getAllFav的返回值获得所有链接 
-        this.selectedFavs = []
 
-        const floatingPanel = this.createFloatingPanel();
-        const leftPanel = this.createLeftPanel();
-        const rightPanel = this.createRightPanel();
-        const startBatchTransferButton = this.createStartBatchTransferButton();
-        const startTransferCurrentButton = this.createStartTransferCurrentButton();
-        const outputTextBox = this.createOutputTextBox();
-        const selectAllButton = this.createSelectAllButton();
-        const minimizeButton = this.createMinimizeButton();
-        const destroyButton = this.createDestroyButton();
-    }
-}
-class BatchTransfer {
-
-    constructor() {
-        this.delayTimeShort = 500;
-        this.delayTimeMiddle = 1000;
-        // 消息类型
-        this.errorCode = 0;
-        this.normalCode = 1;
-        this.startBatchCode = 2;
-        this.startSingleCode = 3;
-        this.endSingleCode = 4;
-        this.endBatchCode = 5;
-
-        this.onePageCode = 6;
-
-        // this.favLinks = this.getAllFavLinks(); // 调用 getAllFav的返回值获得所有链接，没有用到
-        this.favBtns = this.getAllFavBtns(); // 调用 getAllFav的返回值获得所有链接 
-        this.selectedFavs = []
-
+        this.favBtns = favBtns;
         const floatingPanel = this.createFloatingPanel();
         const leftPanel = this.createLeftPanel();
         const rightPanel = this.createRightPanel();
@@ -89,8 +57,6 @@ class BatchTransfer {
         this.leftPanel = leftPanel;
         this.floatingPanel = floatingPanel;
 
-
-        document.body.insertBefore(this.floatingPanel, document.body.firstChild);
     }
 
     createDestroyButton() {
@@ -152,7 +118,7 @@ class BatchTransfer {
         c.addEventListener('mousedown', down)
         // 鼠标松开事件
         document.body.addEventListener('mouseup', up)
-        
+
         // 添加鼠标事件监听器以实现面板拖动
         let isDragging = false;
         let offsetX, offsetY;
@@ -214,13 +180,13 @@ class BatchTransfer {
                 direc = d
                 clientX = e.clientX
                 clientY = e.clientY
-            }else{
+            } else {
                 // 开启拖动
                 isDragging = true;
                 offsetX = e.clientX - floatingPanel.getBoundingClientRect().left;
                 offsetY = e.clientY - floatingPanel.getBoundingClientRect().top;
-                
-                
+
+
             }
         }
 
@@ -399,37 +365,6 @@ class BatchTransfer {
         return rightPanel;
     }
 
-    iterateFavs() {
-        //在floatingPanel中添加多选按钮，将favBtns中的收藏夹名字全部列出来，让用户自己选择需要保存哪些收藏夹。favBtns中每个按钮有title属性，使用 <ul>添加到floatingPanel中，每个ul都选中
-        let ulList = []
-        for (const btn of this.favBtns) {
-            const ul = document.createElement("ul");
-            ul.innerHTML = "<input type='checkbox' id='checkBox' name='checkBox' value='" + btn.title + "' />" + btn.title;
-            ulList.push(ul);
-        }
-        return ulList;
-    }
-
-    createStartBatchTransferButton() {
-        const startBatchTransferButton = document.createElement("button");
-        startBatchTransferButton.textContent = "开始批量转移";
-        startBatchTransferButton.classList.add("btn");
-        startBatchTransferButton.style.margin = "5px";
-        startBatchTransferButton.addEventListener("click", this.initiateBatchOperation.bind(this));
-        return startBatchTransferButton;
-    }
-
-    createStartTransferCurrentButton() {
-        const startTransferCurrentButton = document.createElement("button");
-        startTransferCurrentButton.textContent = "开始转移当前收藏夹";
-        startTransferCurrentButton.classList.add("btn");
-        startTransferCurrentButton.style.margin = "5px";
-        startTransferCurrentButton.addEventListener("click", this.transferOneFav.bind(this));
-
-        return startTransferCurrentButton;
-    }
-
-
     createOutputTextBox() {
 
         // 创建一个 div 元素作为可编辑区域
@@ -471,10 +406,13 @@ class BatchTransfer {
             this.selectAllButton.textContent = "点我全选";
         }
     }
+    
+    appendInfo(info, type = this.normalCode) {
+        this.appendInfoToTextarea(this.outputTextBox, info, type);
+    }
 
-
-    //封装一个函数，接收一个 textarea，以及信息，然后每次将 info添加到textarea中，并且自动滚动
     appendInfoToTextarea(textarea, info, type = this.normalCode) {
+        //封装一个函数，接收一个 textarea，以及信息，然后每次将 info添加到textarea中，并且自动滚动
         // Append info to the textarea
 
         let currentDate = new Date();
@@ -516,6 +454,68 @@ class BatchTransfer {
         textarea.scrollTop = textarea.scrollHeight;
     }
 
+
+    createStartBatchTransferButton() {
+        const startBatchTransferButton = document.createElement("button");
+        startBatchTransferButton.textContent = "开始批量转移";
+        startBatchTransferButton.classList.add("btn");
+        startBatchTransferButton.style.margin = "5px";
+        return startBatchTransferButton;
+    }
+
+    createStartTransferCurrentButton() {
+        const startTransferCurrentButton = document.createElement("button");
+        startTransferCurrentButton.textContent = "开始转移当前收藏夹";
+        startTransferCurrentButton.classList.add("btn");
+        startTransferCurrentButton.style.margin = "5px";
+
+        return startTransferCurrentButton;
+    }
+
+    iterateFavs() {
+        //在floatingPanel中添加多选按钮，将favBtns中的收藏夹名字全部列出来，让用户自己选择需要保存哪些收藏夹。favBtns中每个按钮有title属性，使用 <ul>添加到floatingPanel中，每个ul都选中
+        let ulList = []
+        for (const btn of this.favBtns) {
+            const ul = document.createElement("ul");
+            ul.innerHTML = "<input type='checkbox' id='checkBox' name='checkBox' value='" + btn.title + "' />" + btn.title;
+            ulList.push(ul);
+        }
+        return ulList;
+    }
+
+
+}
+class BatchTransfer {
+
+    constructor() {
+        this.delayTimeShort = 500;
+        this.delayTimeMiddle = 1000;
+        // 消息类型
+        this.errorCode = 0;
+        this.normalCode = 1;
+        this.startBatchCode = 2;
+        this.startSingleCode = 3;
+        this.endSingleCode = 4;
+        this.endBatchCode = 5;
+
+        this.onePageCode = 6;
+
+        // this.favLinks = this.getAllFavLinks(); // 调用 getAllFav的返回值获得所有链接，没有用到
+        this.favBtns = this.getAllFavBtns(); // 调用 getAllFav的返回值获得所有链接 
+        this.selectedFavs = []
+
+        this.ctlPanel=new ControlPanel(this.favBtns);
+        this.floatingPanel = this.ctlPanel.floatingPanel;
+
+        this.ctlPanel.startBatchTransferButton.addEventListener("click", this.initiateBatchOperation.bind(this));
+        this.ctlPanel.startTransferCurrentButton.addEventListener("click", this.transferOneFav.bind(this));
+
+
+        document.body.insertBefore(this.floatingPanel, document.body.firstChild);
+    }
+
+
+
     getAllFavLinks() {
         // 获取包含所需信息的父元素
         let parentElement = document.getElementById('fav-createdList-container');
@@ -542,27 +542,17 @@ class BatchTransfer {
 
         //赋值  this.selectedFavs，从 this.ulList中获取选中的收藏夹
         this.selectedFavs = [];
-        for (const ul of this.ulList) {
+        for (const ul of this.ctlPanel.ulList) {
             if (ul.children[0].checked) {
                 this.selectedFavs.push(ul.children[0].value);
             }
         }
 
         await this.delay(this.delayTimeShort);
-        this.appendInfoToTextarea(this.outputTextBox, "开始批量转移", this.startBatchCode);
-
-        // forEach 会立即执行回调函数
-        // this.favBtns.forEach(async (btn) => {
-        //     console.log("button ");
-        //     btn.click();
-        //     await this.delay(this.delayTimeShort);
-        //     // await this.transferOneFav();
-        // });
-
+        this.ctlPanel.appendInfo("开始批量转移", this.startBatchCode);
 
         for (const btn of this.favBtns) {
             // 如果收藏夹的名字没有选中，则继续循环
-
             if (!(this.selectedFavs.includes(btn.title)))
                 continue;
             btn.click();
@@ -570,7 +560,7 @@ class BatchTransfer {
             await this.transferOneFav();
         }
 
-        this.appendInfoToTextarea(this.outputTextBox, "批量转移结束", this.endBatchCode);
+        this.ctlPanel.appendInfo( "批量转移结束", this.endBatchCode);
 
     }
 
@@ -578,14 +568,14 @@ class BatchTransfer {
         const sourceFavName = document.querySelector('.favInfo-details .fav-name').textContent.trim();
         const totalPagesElement = document.querySelector('.be-pager-item[title^="最后一页"]');
         const totalPages = totalPagesElement ? parseInt(totalPagesElement.textContent.trim().split(':')[0]) : 0;
-        this.appendInfoToTextarea(this.outputTextBox, "开始转移收藏夹" + sourceFavName + ",一共" + totalPages + "页", this.startSingleCode);
+        this.ctlPanel.appendInfo( "开始转移收藏夹" + sourceFavName + ",一共" + totalPages + "页", this.startSingleCode);
 
         // 点击批量操作按钮
         let batchOperationButton = document.querySelector('.filter-item.do-batch .text');
         if (batchOperationButton && batchOperationButton.textContent.trim() === "批量操作") {
             batchOperationButton.click();
         } else {
-            this.appendInfoToTextarea(this.outputTextBox, "Error!!! 找不到'批量操作'按钮或按钮文本不匹配", this.errorCode);
+            this.ctlPanel.appendInfo( "Error!!! 找不到'批量操作'按钮或按钮文本不匹配", this.errorCode);
 
         }
         await this.delay(this.delayTimeShort);
@@ -595,17 +585,17 @@ class BatchTransfer {
     async saveCollection(currentPage, totalPages) {
         const sourceFavName = document.querySelector('.favInfo-details .fav-name').textContent.trim();
         if (currentPage > totalPages || totalPages == 0) {
-            this.appendInfoToTextarea(this.outputTextBox, "收藏夹" + sourceFavName + "转移结束", this.endSingleCode);
+            this.ctlPanel.appendInfo( "收藏夹" + sourceFavName + "转移结束", this.endSingleCode);
             return;
         }
 
-        this.appendInfoToTextarea(this.outputTextBox, "正在保存第" + currentPage + "页");
+        this.ctlPanel.appendInfo( "正在保存第" + currentPage + "页");
 
-        this.appendInfoToTextarea(this.outputTextBox, "点击'全选'按钮");
+        this.ctlPanel.appendInfo( "点击'全选'按钮");
         document.querySelector('.icon-selece-all').parentNode.click();
         await this.delay(this.delayTimeShort);
 
-        this.appendInfoToTextarea(this.outputTextBox, "点击'复制到'按钮");
+        this.ctlPanel.appendInfo( "点击'复制到'按钮");
         document.querySelector('.icon-copy').parentNode.click();
         await this.delay(this.delayTimeShort);
 
@@ -620,25 +610,25 @@ class BatchTransfer {
         });
 
         if (!hasSameNameFav) {
-            this.appendInfoToTextarea(this.outputTextBox, "创建新的收藏夹：" + sourceFavName);
-            this.appendInfoToTextarea(this.outputTextBox, "点击'新建收藏夹'按钮");
+            this.ctlPanel.appendInfo( "创建新的收藏夹：" + sourceFavName);
+            this.ctlPanel.appendInfo( "点击'新建收藏夹'按钮");
             document.querySelector('.fake-fav-input').click();
             await this.delay(this.delayTimeMiddle);
 
-            this.appendInfoToTextarea(this.outputTextBox, "输入新收藏夹名称：" + sourceFavName);
+            this.ctlPanel.appendInfo( "输入新收藏夹名称：" + sourceFavName);
             const inputText = document.querySelector('.add-fav-input');
             inputText.value = sourceFavName;
             inputText.dispatchEvent(new Event('input', { bubbles: true }));
             await this.delay(this.delayTimeShort);
 
-            this.appendInfoToTextarea(this.outputTextBox, "点击'新建'按钮");
+            this.ctlPanel.appendInfo( "点击'新建'按钮");
             document.querySelector('.fav-add-btn').click();
         }
 
         await this.delay(this.delayTimeShort);
 
         const targetFolderName = sourceFavName;
-        this.appendInfoToTextarea(this.outputTextBox, "点击目标收藏夹：" + targetFolderName);
+        this.ctlPanel.appendInfo( "点击目标收藏夹：" + targetFolderName);
         const favListContainer = document.querySelector('.target-favlist-container');
         const favItems = favListContainer.querySelectorAll('.target-favitem');
 
@@ -652,13 +642,13 @@ class BatchTransfer {
 
         await this.delay(this.delayTimeShort);
 
-        this.appendInfoToTextarea(this.outputTextBox, "点击'确定'");
+        this.ctlPanel.appendInfo( "点击'确定'");
         const panel = document.querySelector('.edit-video-modal');
         const confirmBtn = panel.querySelector('.btn-content');
         confirmBtn.click();
         await this.delay(this.delayTimeShort);
 
-        this.appendInfoToTextarea(this.outputTextBox, "点击'下一页'按钮");
+        this.ctlPanel.appendInfo( "点击'下一页'按钮");
         const nextPageBtn = document.querySelector('.be-pager-next');
         nextPageBtn.click();
         await this.delay(this.delayTimeMiddle);
