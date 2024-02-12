@@ -1,14 +1,13 @@
 // 使用 await 和 async 实现批量转移收藏夹功能
 
 class BatchTransfer {
-    constructor() {
 
+    constructor() {
         this.delayTimeShort = 500;
         this.delayTimeMiddle = 1000;
         // this.favLinks = this.getAllFavLinks(); // 调用 getAllFav的返回值获得所有链接 
         this.favBtns = this.getAllFavBtns(); // 调用 getAllFav的返回值获得所有链接 
         this.selectedFavs = []
-
 
 
         // 创建浮动面板
@@ -24,6 +23,23 @@ class BatchTransfer {
         floatingPanel.style.boxShadow = "0 2px 5px rgba(0, 0, 0, 0.1)";
         floatingPanel.style.zIndex = "9999";
 
+        // 创建左侧面板
+        const leftPanel = document.createElement("div");
+        leftPanel.classList.add("left-panel");
+        leftPanel.style.float = "left"; // 左浮动，使其在左侧
+        leftPanel.style.width = "50%"; // 左侧面板占据浮动面板的一半宽度
+        floatingPanel.appendChild(leftPanel);
+
+
+
+        // 创建右侧面板
+        const rightPanel = document.createElement("div");
+        rightPanel.classList.add("right-panel");
+        rightPanel.style.float = "right"; // 右浮动，使其在右侧
+        rightPanel.style.width = "50%"; // 右侧面板占据浮动面板的一半宽度
+        floatingPanel.appendChild(rightPanel);
+
+
         // 创建开始批量转移按钮
         const startBatchTransferButton = document.createElement("button");
         startBatchTransferButton.textContent = "开始批量转移";
@@ -36,8 +52,6 @@ class BatchTransfer {
         startTransferCurrentButton.classList.add("btn");
         startTransferCurrentButton.style.margin = "5px";
 
-
-
         // 创建输出文本框
         const outputTextBox = document.createElement("textarea");
         outputTextBox.style.width = "300px";
@@ -45,149 +59,59 @@ class BatchTransfer {
         outputTextBox.style.marginTop = "10px";
         outputTextBox.style.resize = "none";
 
+
+        //创建全选按钮，点击全选按钮，将所有的收藏夹都选中，然后按钮名字变成点我全部取消，再点击一次，全部取消
+        const selectAllButton = document.createElement("button");
+        selectAllButton.textContent = "点我全选";
+        selectAllButton.classList.add("btn");
+        selectAllButton.style.margin = "5px";
+        selectAllButton.addEventListener("click", function () {
+            if (this.selectAllButton.textContent === "点我全选") {
+                for (const ul of this.ulList) {
+                    ul.children[0].checked = true;
+                }
+                this.selectAllButton.textContent = "点我全部取消";
+            } else {
+                for (const ul of this.ulList) {
+                    ul.children[0].checked = false;
+                }
+                this.selectAllButton.textContent = "点我全选";
+            }
+        }.bind(this));
+
+
+        // final 绑定
+        this.outputTextBox = outputTextBox;
+        this.selectAllButton = selectAllButton;
+        this.startBatchTransferButton = startBatchTransferButton;
+        this.startTransferCurrentButton = startTransferCurrentButton;
+        this.startBatchTransferButton.addEventListener("click", this.initiateBatchOperation.bind(this));
+        this.startTransferCurrentButton.addEventListener("click", this.transferOneFav.bind(this));
+
+
+
+        // 将按钮和文本框添加到浮动面板中
+        leftPanel.appendChild(selectAllButton);
+        leftPanel.appendChild(startBatchTransferButton);
+        leftPanel.appendChild(startTransferCurrentButton);
+
         //在floatingPanel中添加多选按钮，将favBtns中的收藏夹名字全部列出来，让用户自己选择需要保存哪些收藏夹。favBtns中每个按钮有title属性，使用 <ul>添加到floatingPanel中，每个ul都选中
         this.ulList = [];
         for (const btn of this.favBtns) {
             const ul = document.createElement("ul");
             ul.innerHTML = "<input type='checkbox' id='checkBox' name='checkBox' value='" + btn.title + "' />" + btn.title;
             this.ulList.push(ul);
-            floatingPanel.appendChild(ul);
-        }
-
-
-        //创建全选按钮，点击全选按钮，将所有的收藏夹都选中，然后按钮名字变成点我全部取消，再点击一次，全部取消
-
-        const selectAllButton = document.createElement("button");
-        selectAllButton.textContent = "点我全选";
-        selectAllButton.classList.add("btn");
-        selectAllButton.style.margin = "5px";
-        selectAllButton.addEventListener("click", function () {
-            if (this.selectAllButton.textContent === "点我全选") {
-                for (const ul of this.ulList) {
-                    ul.children[0].checked = true;
-                }
-                this.selectAllButton.textContent = "点我全部取消";
-            } else {
-                for (const ul of this.ulList) {
-                    ul.children[0].checked = false;
-                }
-                this.selectAllButton.textContent = "点我全选";
-            }
-        }.bind(this));
-
-
-
-
-
-
-        // final 绑定
-        this.outputTextBox = outputTextBox;
-        this.selectAllButton = selectAllButton;
-
-
-        this.startBatchTransferButton = startBatchTransferButton;
-        this.startTransferCurrentButton = startTransferCurrentButton;
-        this.startBatchTransferButton.addEventListener("click", this.initiateBatchOperation.bind(this));
-        this.startTransferCurrentButton.addEventListener("click", this.transferOneFav.bind(this));
-
-        // 将按钮和文本框添加到浮动面板中
-        floatingPanel.appendChild(startBatchTransferButton);
-        floatingPanel.appendChild(startTransferCurrentButton);
-        floatingPanel.appendChild(this.selectAllButton);
-        floatingPanel.appendChild(outputTextBox);
-
-        this.floatingPanel = floatingPanel;
-        // 将浮动面板添加到页面中
-        this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight
-
-        document.body.insertBefore(this.floatingPanel, document.body.firstChild);
-    }
-
-    constructor() {
-        this.delayTimeShort = 500;
-        this.delayTimeMiddle = 1000;
-        this.favBtns = this.getAllFavBtns();
-        this.selectedFavs = [];
-    
-        const floatingPanel = document.createElement("div");
-        floatingPanel.classList.add("floating-panel");
-        floatingPanel.style.position = "fixed";
-        floatingPanel.style.top = "50px";
-        floatingPanel.style.right = "50px";
-        floatingPanel.style.backgroundColor = "#ffffff";
-        floatingPanel.style.border = "1px solid #ccc";
-        floatingPanel.style.borderRadius = "5px";
-        floatingPanel.style.padding = "10px";
-        floatingPanel.style.boxShadow = "0 2px 5px rgba(0, 0, 0, 0.1)";
-        floatingPanel.style.zIndex = "9999";
-    
-        const leftPanel = document.createElement("div");
-        leftPanel.classList.add("left-panel");
-        floatingPanel.appendChild(leftPanel);
-    
-        const rightPanel = document.createElement("div");
-        rightPanel.classList.add("right-panel");
-        floatingPanel.appendChild(rightPanel);
-    
-        const startBatchTransferButton = document.createElement("button");
-        startBatchTransferButton.textContent = "开始批量转移";
-        startBatchTransferButton.classList.add("btn");
-        startBatchTransferButton.style.margin = "5px";
-    
-        const startTransferCurrentButton = document.createElement("button");
-        startTransferCurrentButton.textContent = "开始转移当前收藏夹";
-        startTransferCurrentButton.classList.add("btn");
-        startTransferCurrentButton.style.margin = "5px";
-    
-        const outputTextBox = document.createElement("textarea");
-        outputTextBox.style.width = "300px";
-        outputTextBox.style.height = "400px";
-        outputTextBox.style.marginTop = "10px";
-        outputTextBox.style.resize = "none";
-    
-        const selectAllButton = document.createElement("button");
-        selectAllButton.textContent = "点我全选";
-        selectAllButton.classList.add("btn");
-        selectAllButton.style.margin = "5px";
-        selectAllButton.addEventListener("click", function () {
-            if (this.selectAllButton.textContent === "点我全选") {
-                for (const ul of this.ulList) {
-                    ul.children[0].checked = true;
-                }
-                this.selectAllButton.textContent = "点我全部取消";
-            } else {
-                for (const ul of this.ulList) {
-                    ul.children[0].checked = false;
-                }
-                this.selectAllButton.textContent = "点我全选";
-            }
-        }.bind(this));
-    
-        this.outputTextBox = outputTextBox;
-        this.selectAllButton = selectAllButton;
-        this.startBatchTransferButton = startBatchTransferButton;
-        this.startTransferCurrentButton = startTransferCurrentButton;
-        this.startBatchTransferButton.addEventListener("click", this.initiateBatchOperation.bind(this));
-        this.startTransferCurrentButton.addEventListener("click", this.transferOneFav.bind(this));
-    
-        leftPanel.appendChild(startBatchTransferButton);
-        leftPanel.appendChild(startTransferCurrentButton);
-        leftPanel.appendChild(selectAllButton);
-        for (const btn of this.favBtns) {
-            const ul = document.createElement("ul");
-            ul.innerHTML = "<input type='checkbox' id='checkBox' name='checkBox' value='" + btn.title + "' />" + btn.title;
-            this.ulList.push(ul);
             leftPanel.appendChild(ul);
         }
-    
+
         rightPanel.appendChild(outputTextBox);
-    
+
         this.floatingPanel = floatingPanel;
         this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight;
-    
+
         document.body.insertBefore(this.floatingPanel, document.body.firstChild);
     }
-    
+
 
     getAllFavLinks() {
         // 获取包含所需信息的父元素
