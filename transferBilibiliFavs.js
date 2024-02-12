@@ -27,7 +27,7 @@ class BatchTransfer {
         const leftPanel = document.createElement("div");
         leftPanel.classList.add("left-panel");
         leftPanel.style.float = "left"; // 左浮动，使其在左侧
-        leftPanel.style.width = "50%"; // 左侧面板占据浮动面板的一半宽度
+        leftPanel.style.width = "40%"; // 左侧面板占据浮动面板的一半宽度
         floatingPanel.appendChild(leftPanel);
 
 
@@ -36,7 +36,7 @@ class BatchTransfer {
         const rightPanel = document.createElement("div");
         rightPanel.classList.add("right-panel");
         rightPanel.style.float = "right"; // 右浮动，使其在右侧
-        rightPanel.style.width = "50%"; // 右侧面板占据浮动面板的一半宽度
+        rightPanel.style.width = "60%"; // 右侧面板占据浮动面板的一半宽度
         floatingPanel.appendChild(rightPanel);
 
 
@@ -54,7 +54,7 @@ class BatchTransfer {
 
         // 创建输出文本框
         const outputTextBox = document.createElement("textarea");
-        outputTextBox.style.width = "300px";
+        outputTextBox.style.width = "340px";
         outputTextBox.style.height = "400px";
         outputTextBox.style.marginTop = "10px";
         outputTextBox.style.resize = "none";
@@ -89,7 +89,6 @@ class BatchTransfer {
         this.startTransferCurrentButton.addEventListener("click", this.transferOneFav.bind(this));
 
 
-
         // 将按钮和文本框添加到浮动面板中
         leftPanel.appendChild(selectAllButton);
         leftPanel.appendChild(startBatchTransferButton);
@@ -107,22 +106,35 @@ class BatchTransfer {
         rightPanel.appendChild(outputTextBox);
 
         this.floatingPanel = floatingPanel;
-        this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight;
+        // this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight;
 
         document.body.insertBefore(this.floatingPanel, document.body.firstChild);
     }
 
 
+    //封装一个函数，接收一个 textarea，以及信息，然后每次将 info添加到textarea中，并且自动滚动
+    appendInfoToTextarea(textarea, info) {
+        // Append info to the textarea
+ 
+        let currentDate = new Date();
+        let formattedDate = currentDate.toISOString().replace(/T/, ' ').replace(/\..+/, '');
+        textarea.value += formattedDate + ':';
+        textarea.value += info + '\n';
+
+        // Scroll to the bottom
+        textarea.scrollTop = textarea.scrollHeight;
+    }
+
     getAllFavLinks() {
         // 获取包含所需信息的父元素
-        var parentElement = document.getElementById('fav-createdList-container');
+        let parentElement = document.getElementById('fav-createdList-container');
         // 获取所有包含 href 属性的 a 标签
-        var links = parentElement.querySelectorAll('a[href]');
+        let links = parentElement.querySelectorAll('a[href]');
         return links;
     }
 
     getAllFavBtns() {
-        var buttons = document.querySelectorAll('#fav-createdList-container .fav-item a');
+        let buttons = document.querySelectorAll('#fav-createdList-container .fav-item a');
         return buttons;
         // 模拟点击每一个按钮
         buttons.forEach(function (button) {
@@ -146,8 +158,7 @@ class BatchTransfer {
         }
 
         await this.delay(this.delayTimeShort);
-        this.outputTextBox.value += "开始批量转移。\n";
-        this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+        this.appendInfoToTextarea(this.outputTextBox, "开始批量转移。");
 
         // forEach 会立即执行回调函数
         // this.favBtns.forEach(async (btn) => {
@@ -164,30 +175,26 @@ class BatchTransfer {
             if (!(this.selectedFavs.includes(btn.title)))
                 continue;
             btn.click();
-            this.outputTextBox.value += "开始转移收藏夹" + btn.title + '\n';
-            this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight;
+            this.appendInfoToTextarea(this.outputTextBox, "开始转移收藏夹" + btn.title);
             await this.delay(this.delayTimeShort);
             await this.transferOneFav();
         }
 
-        this.outputTextBox.value += "全部转移结束" + '\n';
-        this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight;
+        this.appendInfoToTextarea(this.outputTextBox, "全部转移结束");
 
     }
 
     async transferOneFav() {
         const totalPagesElement = document.querySelector('.be-pager-item[title^="最后一页"]');
         const totalPages = totalPagesElement ? parseInt(totalPagesElement.textContent.trim().split(':')[0]) : 0;
-        this.outputTextBox.value += "一共" + totalPages + "页\n";
-        this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+        this.appendInfoToTextarea(this.outputTextBox, "一共" + totalPages + "页");
 
         // 点击批量操作按钮
-        var batchOperationButton = document.querySelector('.filter-item.do-batch .text');
+        let batchOperationButton = document.querySelector('.filter-item.do-batch .text');
         if (batchOperationButton && batchOperationButton.textContent.trim() === "批量操作") {
             batchOperationButton.click();
         } else {
-            this.outputTextBox.value += "找不到批量操作按钮或按钮文本不匹配。\n";
-            this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+            this.appendInfoToTextarea(this.outputTextBox, "找不到批量操作按钮或按钮文本不匹配。");
 
         }
         await this.delay(this.delayTimeShort);
@@ -196,20 +203,17 @@ class BatchTransfer {
 
     async saveCollection(currentPage, totalPages) {
         if (currentPage > totalPages || totalPages == 0) {
-            this.outputTextBox.value += "已保存到最后一页。\n";
-            this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+            this.appendInfoToTextarea(this.outputTextBox, "已保存到最后一页。");
             return;
         }
 
-        this.outputTextBox.value += "正在保存第" + currentPage + "页的收藏夹内容。\n";
+        this.appendInfoToTextarea(this.outputTextBox, "正在保存第" + currentPage + "页的收藏夹内容。");
 
-        this.outputTextBox.value += "点击全选按钮\n";
-        this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+        this.appendInfoToTextarea(this.outputTextBox, "点击全选按钮");
         document.querySelector('.icon-selece-all').parentNode.click();
         await this.delay(this.delayTimeShort);
 
-        this.outputTextBox.value += "点击复制到按钮\n";
-        this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+        this.appendInfoToTextarea(this.outputTextBox, "点击复制到按钮");
         document.querySelector('.icon-copy').parentNode.click();
         await this.delay(this.delayTimeShort);
 
@@ -225,30 +229,25 @@ class BatchTransfer {
         });
 
         if (!hasSameNameFav) {
-            this.outputTextBox.value += "创建新的收藏夹：" + sourceFavName + "\n";
-            this.outputTextBox.value += "点击新建收藏夹按钮\n";
-            this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+            this.appendInfoToTextarea(this.outputTextBox, "创建新的收藏夹：" + sourceFavName);
+            this.appendInfoToTextarea(this.outputTextBox, "点击新建收藏夹按钮");
             document.querySelector('.fake-fav-input').click();
             await this.delay(this.delayTimeMiddle);
 
-            this.outputTextBox.value += "输入新收藏夹名称：" + sourceFavName + "\n";
-            this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+            this.appendInfoToTextarea(this.outputTextBox, "输入新收藏夹名称：" + sourceFavName);
             const inputText = document.querySelector('.add-fav-input');
             inputText.value = sourceFavName;
             inputText.dispatchEvent(new Event('input', { bubbles: true }));
             await this.delay(this.delayTimeShort);
 
-            this.outputTextBox.value += "点击新建按钮\n";
-            this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+            this.appendInfoToTextarea(this.outputTextBox, "点击新建按钮");
             document.querySelector('.fav-add-btn').click();
-            this.outputTextBox.value += document.querySelector('.fav-add-btn') + "\n";
         }
 
         await this.delay(this.delayTimeShort);
 
         const targetFolderName = sourceFavName;
-        this.outputTextBox.value += "点击目标收藏夹：" + targetFolderName + "\n";
-        this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+        this.appendInfoToTextarea(this.outputTextBox, "点击目标收藏夹：" + targetFolderName);
         const favListContainer = document.querySelector('.target-favlist-container');
         const favItems = favListContainer.querySelectorAll('.target-favitem');
 
@@ -262,20 +261,19 @@ class BatchTransfer {
 
         await this.delay(this.delayTimeShort);
 
-        this.outputTextBox.value += "点击确定\n";
-        this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+        this.appendInfoToTextarea(this.outputTextBox, "点击确定");
         const panel = document.querySelector('.edit-video-modal');
         const confirmBtn = panel.querySelector('.btn-content');
         confirmBtn.click();
         await this.delay(this.delayTimeShort);
 
-        this.outputTextBox.value += "点击下一页按钮\n";
-        this.outputTextBox.scrollTop = this.outputTextBox.scrollHeight; // 每次向文本框中添加内容时，将滚动条定位到最后一行
+        this.appendInfoToTextarea(this.outputTextBox, "点击下一页按钮");
         const nextPageBtn = document.querySelector('.be-pager-next');
         nextPageBtn.click();
         await this.delay(this.delayTimeMiddle);
         await this.saveCollection(currentPage + 1, totalPages);
     }
 }
+
 
 const batchTransfer = new BatchTransfer();
