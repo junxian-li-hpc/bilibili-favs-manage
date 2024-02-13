@@ -91,6 +91,7 @@ class ControlPanel {
         this.floatingPanel.style.height = this.minH + "px";
     }
 
+    
 
     toggleSelectAll() {
         if (this.selectAllButton.textContent === "点我全选") {
@@ -640,4 +641,8 @@ class BatchTransfer {
 }
 
 
-const bt = new BatchTransfer();
+document.addEventListener("DOMContentLoaded", function () {
+    // 在页面加载完毕后执行您的脚本
+    // 例如，您可以在这里操作页面元素
+    const bt = new BatchTransfer();
+});
