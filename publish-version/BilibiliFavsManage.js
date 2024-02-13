@@ -1,3 +1,19 @@
+// ==UserScript==
+// @name         bilibili 收藏夹批量复制
+// @namespace    http://tampermonkey.net/
+// @version      2024-02-13 v0.1
+// @description  批量复制bilibili收藏夹!
+// @author       You
+// @match        https://space.bilibili.com/*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=bilibili.com
+// @license      MIT
+// @grant        none
+// @downloadURL https://update.greasyfork.org/scripts/487232/bilibili%20%E6%94%B6%E8%97%8F%E5%A4%B9%E6%89%B9%E9%87%8F%E5%A4%8D%E5%88%B6.user.js
+// @updateURL https://update.greasyfork.org/scripts/487232/bilibili%20%E6%94%B6%E8%97%8F%E5%A4%B9%E6%89%B9%E9%87%8F%E5%A4%8D%E5%88%B6.meta.js
+// ==/UserScript==
+
+(function() {
+    'use strict';
 
 class ControlPanel {
     constructor(favBtns) {
@@ -631,3 +647,7 @@ class BatchTransfer {
 setTimeout(function () {
     let bt = new BatchTransfer()
 }, 3000);
+
+
+    // Your code here...
+})();
