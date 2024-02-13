@@ -1,4 +1,10 @@
-qq group:524764959
+# contact me
+qq group: 524764959
+
+email: ljx.1024@outlook.com
+
+https://github.com/junxian-li-hpc/bilibili-favs-manage
+
 # initial publish version
 2024-02-13
 使用方法，打开要转移的网页，3秒后会弹出窗口，之所以3秒是因为脚本会自动从网页中获取收藏夹的名字，所以要确保网页加载完毕，这一点之后可以优化为一个刷新按钮。
