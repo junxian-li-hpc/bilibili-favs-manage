@@ -55,8 +55,15 @@ class ControlPanel {
 
 
 
-        this.rightPanel = this.createSubPanel("right-panel", "right");
+        this.rightPanel = this.createSubPanel("right-panel", "right", "auto", "auto");
+        this.rightPanel.style.flexGrow = "1";
+
+        //让 this.rightPanel 的宽度随着this.floatingPanel的大小更改而改变
+        // this.rightPanel.style.resize = "both";
+        // this.rightPanel.style.width = "100%";
+
         const outputTextBox = this.createOutputTextBox();
+        outputTextBox.style.flexGrow = "1";
         // this.rightPanel = this.createSubPanel("right-panel", "right", this.rightWidth);
         this.rightPanel.appendChild(outputTextBox);
 
@@ -99,12 +106,17 @@ class ControlPanel {
 
     toggleMinimize() {
         if (this.minimizeButton.textContent === "点我最小化") {
-            this.rightPanel.remove();
+            //将this.floatPanel隐藏，然后新建一个 newMiniziPanel只显示minimizeButton
+            this.floatingPanel.remove();
+            this.newMiniziPanel = this.createFloatingPanel();
+            this.newMiniziPanel.appendChild(this.minimizeButton);
+            document.body.insertBefore(this.newMiniziPanel, document.body.firstChild);
             this.minimizeButton.textContent = "点我打开面板";
         } else {
-            this.floatingPanel.appendChild(this.rightPanel);
-            document.body.insertBefore(this.floatingPanel, document.body.firstChild);
+            //将新建的newMiniziPanel删除，然后显示this.floatingPanel
+            this.newMiniziPanel.remove();
             this.minimizeButton.textContent = "点我最小化";
+            document.body.insertBefore(this.floatingPanel, document.body.firstChild);
         }
     }
     createButton(text, clickHandler) {
@@ -137,7 +149,7 @@ class ControlPanel {
         floatingPanel.classList.add("floating-panel");
         floatingPanel.style.position = "fixed";
         floatingPanel.style.top = "50px";
-        // floatingPanel.style.right = "50px";
+        floatingPanel.style.left = "50px";
         floatingPanel.style.backgroundColor = "#ffffff";
         floatingPanel.style.border = "0px solid #ccc";
         floatingPanel.style.borderRadius = "5px";
@@ -199,8 +211,7 @@ class ControlPanel {
                 resizeable = true
                 isDragging = false
                 direc = d
-                // clientX = e.clientX
-                // clientY = e.clientY
+
             } else {
                 // 开启拖动
                 isDragging = true;
@@ -349,6 +360,10 @@ class ControlPanel {
             subPanel.style.width = width;
         // else
         //     subPanel.style.width = "auto"; // 设置宽度为自适应内容
+
+        if(height){
+            subPanel.style.height = height;
+        }
 
         // 添加边界线
         subPanel.style.border = "1px solid #ccc";
