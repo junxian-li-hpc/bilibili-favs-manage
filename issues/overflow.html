@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editable Panel with Scrollbar</title>
+    <style>
+        #panel {
+            background-color: lightgray;
+            /* 设置外部 div 的背景色 */
+            display: flex;
+            flex-direction: column;
+            /* height: 200px; */
+            /* 设置外部 div 的高度 */
+            /* 添加滚动条 */
+            flex-grow: 1;
+            /* 允许外部 div 根据需要扩展 */
+        }
+
+        #edit {
+            /* width: 50%; */
+            /* 使内部 div 宽度充满外部 div */
+            /* height: 50%; */
+            background-color: aqua;
+            /* 使内部 div 高度充满外部 div */
+            outline: none;
+            flex-grow: 1;
+            overflow: auto;
+
+            /* 去除默认的可编辑 div 聚焦时的边框 */
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="panel">
+        <div id="edit" contenteditable="true">
+            <!-- 这里是可编辑内容 -->
+        </div>
+    </div>
+
+</body>
+
+</html>

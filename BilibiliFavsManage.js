@@ -25,7 +25,7 @@ class ControlPanel {
         const selectAllButton = this.createButton("点我全选", this.toggleSelectAll.bind(this));
         const startBatchTransferButton = this.createButton("开始批量转移");
         const startTransferCurrentButton = this.createButton("开始转移当前收藏夹");
-        const minimizeButton = this.createButton("点我最小化", this.toggleMinimize.bind(this));
+        const minimizeButton = this.createButton("点我最小化", this.toggleMinimize.bind(this), "minimize-btn");
         const destroyButton = this.createButton('点我销毁', () => {
             this.floatingPanel.remove();
         });
@@ -48,23 +48,22 @@ class ControlPanel {
             srcFavPanel.appendChild(ul);
             dstFavPanel.appendChild(ul.cloneNode(true));
         }
-        this.leftPanel = this.createSubPanel("left-panel", "left",);
+        this.leftPanel = this.createSubPanel("left-panel", "left");
         // this.leftPanel = this.createSubPanel("left-panel", "left", this.leftWidth);
         this.leftPanel.appendChild(btnPanel);
         this.leftPanel.appendChild(favPanel);
 
 
 
-        this.rightPanel = this.createSubPanel("right-panel", "right", "auto", "auto");
+        this.rightPanel = this.createSubPanel("right-panel", "right");
         this.rightPanel.style.flexGrow = "1";
-
+        this.rightPanel.style.display = "flex"
+        // this.rightPanel.style.overflow = "auto";
         //让 this.rightPanel 的宽度随着this.floatingPanel的大小更改而改变
-        // this.rightPanel.style.resize = "both";
-        // this.rightPanel.style.width = "100%";
+
 
         const outputTextBox = this.createOutputTextBox();
-        outputTextBox.style.flexGrow = "1";
-        // this.rightPanel = this.createSubPanel("right-panel", "right", this.rightWidth);
+
         this.rightPanel.appendChild(outputTextBox);
 
         this.floatingPanel = this.createFloatingPanel();
@@ -87,6 +86,9 @@ class ControlPanel {
     recordPanelSize() {
         this.minH = this.floatingPanel.offsetHeight;
         this.minW = this.floatingPanel.offsetWidth;
+        //这很重要
+        this.floatingPanel.style.width = this.minW + "px";
+        this.floatingPanel.style.height = this.minH + "px";
     }
 
 
@@ -106,20 +108,16 @@ class ControlPanel {
 
     toggleMinimize() {
         if (this.minimizeButton.textContent === "点我最小化") {
-            //将this.floatPanel隐藏，然后新建一个 newMiniziPanel只显示minimizeButton
-            this.floatingPanel.remove();
-            this.newMiniziPanel = this.createFloatingPanel();
-            this.newMiniziPanel.appendChild(this.minimizeButton);
-            document.body.insertBefore(this.newMiniziPanel, document.body.firstChild);
+            //将this.rightPanel从floatingPanel中移除
+            this.rightPanel.remove();
             this.minimizeButton.textContent = "点我打开面板";
         } else {
-            //将新建的newMiniziPanel删除，然后显示this.floatingPanel
-            this.newMiniziPanel.remove();
             this.minimizeButton.textContent = "点我最小化";
-            document.body.insertBefore(this.floatingPanel, document.body.firstChild);
+            this.floatingPanel.appendChild(this.rightPanel);
         }
     }
-    createButton(text, clickHandler) {
+
+    createButton(text, clickHandler, className = "btn") {
         const button = document.createElement("button");
         button.textContent = text;
 
@@ -133,14 +131,75 @@ class ControlPanel {
         button.style.height = '40px';
 
         //修改和上边按钮的边距
-        button.style.marginTop = '10px';
-        button.style.marginLeft = '10px';
+        button.style.marginTop = '5px';
+        button.style.marginLeft = '5px';
 
         if (clickHandler)
             button.addEventListener("click", clickHandler);
 
         return button;
     }
+
+
+    createSubPanel(className, floatPos, width, height) {
+        const subPanel = document.createElement("div");
+        if (className)
+            subPanel.classList.add(className);
+        if (floatPos)
+            subPanel.style.float = floatPos;
+        if (width)
+            subPanel.style.width = width;
+
+        if (height) {
+            subPanel.style.height = height;
+        }
+        // 添加边界线
+        subPanel.style.border = "1px solid #ccc";
+        return subPanel;
+    }
+
+
+    createOutputTextBox() {
+
+        // 创建一个 div 元素作为可编辑区域
+        const editableArea = document.createElement('div');
+
+        // 设置可编辑区域的样式
+        editableArea.style.width = '340px'; // 设置固定宽度
+        // editableArea.style.height = '400px'; // 设置固定高度
+        editableArea.style.border = '1px solid #ccc'; // 边框样式
+        editableArea.style.padding = '5px'; // 内边距
+        editableArea.style.boxSizing = 'border-box'; // 盒模型
+        editableArea.contentEditable = true; // 设置为可编辑
+        editableArea.style.flexGrow = "1";
+        // editableArea.style.flex = "0 0 auto";
+
+        editableArea.style.overflow = 'scroll'; // 当内容溢出时显示滚动条
+        // editableArea.style.overflowx = 'auto'; // 当内容溢出时显示滚动条
+        // editableArea.style.maxWidth = "100%"; // 设置最大宽度以触发水平滚动条
+        editableArea.style.maxHeight = "100%"; // 设置最大高度以触发垂直滚动条
+        // editableArea.style.minWidth = "0";
+        editableArea.style.minHeight = "0";
+
+
+        // 通过 flex实现了，所以不需要事件了
+        // 监听panel大小变化事件，并相应调整editableArea大小
+        // const resizeObserver = new ResizeObserver(entries => {
+        //     for (let entry of entries) {
+        //         const { width, height } = entry.contentRect;
+        //         editableArea.style.width = width + 'px';
+        //         editableArea.style.height = height + 'px';
+        //         console.log('right panel size:' + width + '  ' + height);
+        //     }
+        // });
+
+        // resizeObserver.observe(this.rightPanel);
+
+        return editableArea;
+
+
+    }
+
 
     createFloatingPanel() {
         // div可修改的最小宽高
@@ -157,14 +216,12 @@ class ControlPanel {
         floatingPanel.style.boxShadow = "0 2px 5px rgba(0, 0, 0, 0.1)";
         floatingPanel.style.zIndex = "99999";
 
-        // floatingPanel.style.width = this.minW + "px";
-        // floatingPanel.style.height = this.minH + "px";
-        //让floatingPanel自适应内容
+        // floatingPanel.style.overflow = "auto";
         floatingPanel.style.display = "flex";
 
-        //可以手动调整面板的大小
-        // floatingPanel.style.resize = "both";
-        // floatingPanel.style.overflow = "auto";
+
+        //让floatingPanel自适应内容
+
 
         //可以手动移动面板
         floatingPanel.style.userSelect = "none";
@@ -349,63 +406,6 @@ class ControlPanel {
 
         return floatingPanel;
     }
-
-    createSubPanel(className, floatPos, width, height) {
-        const subPanel = document.createElement("div");
-        if (className)
-            subPanel.classList.add(className);
-        if (floatPos)
-            subPanel.style.float = floatPos;
-        if (width)
-            subPanel.style.width = width;
-        // else
-        //     subPanel.style.width = "auto"; // 设置宽度为自适应内容
-
-        if(height){
-            subPanel.style.height = height;
-        }
-
-        // 添加边界线
-        subPanel.style.border = "1px solid #ccc";
-        // console.log("subpanel width height:", subPanel.offsetWidth, subPanel.offsetHeight)
-        return subPanel;
-    }
-
-
-    createOutputTextBox() {
-
-        // 创建一个 div 元素作为可编辑区域
-        const editableArea = document.createElement('div');
-
-        // 设置可编辑区域的样式
-        editableArea.style.width = '340px'; // 设置固定宽度
-        // editableArea.style.height = '400px'; // 设置固定高度
-        editableArea.style.overflow = 'auto'; // 当内容溢出时显示滚动条
-        editableArea.style.border = '1px solid #ccc'; // 边框样式
-        editableArea.style.padding = '5px'; // 内边距
-        editableArea.style.boxSizing = 'border-box'; // 盒模型
-        editableArea.contentEditable = true; // 设置为可编辑
-        //设置自动调节大小
-        // editableArea.style.resize = "both";
-
-        // 监听panel大小变化事件，并相应调整editableArea大小
-        const resizeObserver = new ResizeObserver(entries => {
-            for (let entry of entries) {
-                const { width, height } = entry.contentRect;
-                editableArea.style.width = width + 'px';
-                editableArea.style.height = height + 'px';
-                console.log('right panel size:' + width + '  ' + height);
-            }
-        });
-
-        resizeObserver.observe(this.rightPanel);
-
-        return editableArea;
-
-
-    }
-
-
     appendInfo(info, type = this.normalCode) {
         this.appendInfoToTextarea(this.outputTextBox, info, type);
     }
@@ -486,15 +486,15 @@ class BatchTransfer {
         this.favBtns = this.getAllFavBtns(); // 调用 getAllFav的返回值获得所有链接 
         this.selectedFavs = []
 
-        this.ctlPanel = new ControlPanel(this.favBtns);
-        this.floatingPanel = this.ctlPanel.floatingPanel;
+        this.ctl = new ControlPanel(this.favBtns);
+        this.floatingPanel = this.ctl.floatingPanel;
 
-        this.ctlPanel.startBatchTransferButton.addEventListener("click", this.initiateBatchOperation.bind(this));
-        this.ctlPanel.startTransferCurrentButton.addEventListener("click", this.transferOneFav.bind(this));
+        this.ctl.startBatchTransferButton.addEventListener("click", this.initiateBatchOperation.bind(this));
+        this.ctl.startTransferCurrentButton.addEventListener("click", this.transferOneFav.bind(this));
 
 
         document.body.insertBefore(this.floatingPanel, document.body.firstChild);
-        this.ctlPanel.recordPanelSize();
+        this.ctl.recordPanelSize();
     }
 
 
@@ -525,14 +525,14 @@ class BatchTransfer {
 
         //赋值  this.selectedFavs，从 this.ulList中获取选中的收藏夹
         this.selectedFavs = [];
-        for (const ul of this.ctlPanel.ulList) {
+        for (const ul of this.ctl.ulList) {
             if (ul.children[0].checked) {
                 this.selectedFavs.push(ul.children[0].value);
             }
         }
 
         await this.delay(this.delayTimeShort);
-        this.ctlPanel.appendInfo("开始批量转移", this.startBatchCode);
+        this.ctl.appendInfo("开始批量转移", this.startBatchCode);
 
         for (const btn of this.favBtns) {
             // 如果收藏夹的名字没有选中，则继续循环
@@ -543,7 +543,7 @@ class BatchTransfer {
             await this.transferOneFav();
         }
 
-        this.ctlPanel.appendInfo("批量转移结束", this.endBatchCode);
+        this.ctl.appendInfo("批量转移结束", this.endBatchCode);
 
     }
 
@@ -551,14 +551,14 @@ class BatchTransfer {
         const sourceFavName = document.querySelector('.favInfo-details .fav-name').textContent.trim();
         const totalPagesElement = document.querySelector('.be-pager-item[title^="最后一页"]');
         const totalPages = totalPagesElement ? parseInt(totalPagesElement.textContent.trim().split(':')[0]) : 0;
-        this.ctlPanel.appendInfo("开始转移收藏夹" + sourceFavName + ",一共" + totalPages + "页", this.startSingleCode);
+        this.ctl.appendInfo("开始转移收藏夹" + sourceFavName + ",一共" + totalPages + "页", this.startSingleCode);
 
         // 点击批量操作按钮
         let batchOperationButton = document.querySelector('.filter-item.do-batch .text');
         if (batchOperationButton && batchOperationButton.textContent.trim() === "批量操作") {
             batchOperationButton.click();
         } else {
-            this.ctlPanel.appendInfo("Error!!! 找不到'批量操作'按钮或按钮文本不匹配", this.errorCode);
+            this.ctl.appendInfo("Error!!! 找不到'批量操作'按钮或按钮文本不匹配", this.errorCode);
 
         }
         await this.delay(this.delayTimeShort);
@@ -568,17 +568,17 @@ class BatchTransfer {
     async saveCollection(currentPage, totalPages) {
         const sourceFavName = document.querySelector('.favInfo-details .fav-name').textContent.trim();
         if (currentPage > totalPages || totalPages == 0) {
-            this.ctlPanel.appendInfo("收藏夹" + sourceFavName + "转移结束", this.endSingleCode);
+            this.ctl.appendInfo("收藏夹" + sourceFavName + "转移结束", this.endSingleCode);
             return;
         }
 
-        this.ctlPanel.appendInfo("正在保存第" + currentPage + "页");
+        this.ctl.appendInfo("正在保存第" + currentPage + "页");
 
-        this.ctlPanel.appendInfo("点击'全选'按钮");
+        this.ctl.appendInfo("点击'全选'按钮");
         document.querySelector('.icon-selece-all').parentNode.click();
         await this.delay(this.delayTimeShort);
 
-        this.ctlPanel.appendInfo("点击'复制到'按钮");
+        this.ctl.appendInfo("点击'复制到'按钮");
         document.querySelector('.icon-copy').parentNode.click();
         await this.delay(this.delayTimeShort);
 
@@ -593,25 +593,25 @@ class BatchTransfer {
         });
 
         if (!hasSameNameFav) {
-            this.ctlPanel.appendInfo("创建新的收藏夹：" + sourceFavName);
-            this.ctlPanel.appendInfo("点击'新建收藏夹'按钮");
+            this.ctl.appendInfo("创建新的收藏夹：" + sourceFavName);
+            this.ctl.appendInfo("点击'新建收藏夹'按钮");
             document.querySelector('.fake-fav-input').click();
             await this.delay(this.delayTimeMiddle);
 
-            this.ctlPanel.appendInfo("输入新收藏夹名称：" + sourceFavName);
+            this.ctl.appendInfo("输入新收藏夹名称：" + sourceFavName);
             const inputText = document.querySelector('.add-fav-input');
             inputText.value = sourceFavName;
             inputText.dispatchEvent(new Event('input', { bubbles: true }));
             await this.delay(this.delayTimeShort);
 
-            this.ctlPanel.appendInfo("点击'新建'按钮");
+            this.ctl.appendInfo("点击'新建'按钮");
             document.querySelector('.fav-add-btn').click();
         }
 
         await this.delay(this.delayTimeShort);
 
         const targetFolderName = sourceFavName;
-        this.ctlPanel.appendInfo("点击目标收藏夹：" + targetFolderName);
+        this.ctl.appendInfo("点击目标收藏夹：" + targetFolderName);
         const favListContainer = document.querySelector('.target-favlist-container');
         const favItems = favListContainer.querySelectorAll('.target-favitem');
 
@@ -625,13 +625,13 @@ class BatchTransfer {
 
         await this.delay(this.delayTimeShort);
 
-        this.ctlPanel.appendInfo("点击'确定'");
+        this.ctl.appendInfo("点击'确定'");
         const panel = document.querySelector('.edit-video-modal');
         const confirmBtn = panel.querySelector('.btn-content');
         confirmBtn.click();
         await this.delay(this.delayTimeShort);
 
-        this.ctlPanel.appendInfo("点击'下一页'按钮");
+        this.ctl.appendInfo("点击'下一页'按钮");
         const nextPageBtn = document.querySelector('.be-pager-next');
         nextPageBtn.click();
         await this.delay(this.delayTimeMiddle);
