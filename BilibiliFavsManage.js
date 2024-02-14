@@ -1,4 +1,4 @@
-// 使用 await 和 async 实现批量转移收藏夹功能
+// 使用 await 和 async 实现批量复制收藏夹功能
 
 class EventListeners {
 
@@ -30,20 +30,22 @@ class EventListeners {
     }
 
     static toggleMinimize() {
+        const floP = this.floatingPanel;
         if (this.minimizeButton.textContent === "点我最小化") {
-            // 记录最小化前的面板大小
-            this.recordHiddenPanelSize();
+
+            this.recordHiddenPanelSize(); // 记录最小化前的面板大小
             this.minimizeButton.textContent = "点我打开面板";
-            // this.outputTextBox.style.width='0px'
-            this.floatingPanel.style.width = this.leftPanel.offsetWidth + "px";
-            // this.rightPanel.remove();
+            // this.rightPanel.style.width='0px' //缩小子面板好像没用,
+            floP.style.width = this.minW + "px";
+            floP.style.height = this.minH + "px";
 
         } else {
             this.minimizeButton.textContent = "点我最小化";
-            this.floatingPanel.appendChild(this.rightPanel);
+
+            floP.style.width = Math.max(this.hiddenWidth, floP.offsetWidth, this.originFPW) + "px";
+            floP.style.height = Math.max(this.hiddenHeight, floP.offsetHeight, this.originFPH) + "px";
 
         }
-        // this.minimizeUpdatePanel();
     }
 
     // 鼠标松开时结束尺寸修改
@@ -97,7 +99,7 @@ class EventListeners {
             const direc = this.direction;
             let newWidth = floP.offsetWidth;
             let newHeight = floP.offsetHeight;
-            console.log("newWidth:" + newWidth + "  newHeight:" + newHeight);
+            // console.log("newWidth:" + newWidth + "  newHeight:" + newHeight);
 
             let originTop = floP.offsetTop;
             let originLeft = floP.offsetLeft;
@@ -190,57 +192,30 @@ class CreateElemClass {
 
         // 设置可编辑区域的样式
         editableArea.classList.add('output-text-box');
-        editableArea.style.width = '200px'; // 设置固定宽度
+        // editableArea.style.width = '200px'; // 设置固定宽度
         // editableArea.style.height = '400px'; // 设置固定高度
         editableArea.style.border = '1px solid #ccc'; // 边框样式
         editableArea.style.padding = '5px'; // 内边距
         editableArea.style.boxSizing = 'border-box'; // 盒模型
+        editableArea.style.whiteSpace = 'nowrap'; // 设置不允许折行显示
+        editableArea.style.minWidth = "400px";
         editableArea.contentEditable = true; // 设置为可编辑
         editableArea.style.flexGrow = "1";
-        // editableArea.style.flex = "0 0 auto";
+        // editableArea.style.display = 'flex';
+        // 如果加了这一条,会使得文本内容安装类似一列一列的格式显示
 
-        editableArea.style.overflow = 'scroll'; // 当内容溢出时显示滚动条
-        editableArea.style.overflowX = 'scroll'; // 当内容溢出时显示滚动条
-        editableArea.style.maxWidth = "100%"; // 设置最大宽度以触发水平滚动条
-        editableArea.style.maxHeight = "100%"; // 设置最大高度以触发垂直滚动条
-        editableArea.style.minWidth = "0";
-        editableArea.style.minHeight = "0";
+        editableArea.style.overflow = 'auto'; // 当内容溢出时显示滚动条
+        // editableArea.style.overflowX = 'auto'; // 当内容溢出时显示滚动条
+        // editableArea.style.overflowX = 'auto'; // 当内容溢出时显示滚动条
+        // editableArea.style.maxWidth = "100%"; // 设置最大宽度以触发水平滚动条
+        // editableArea.style.maxHeight = "100%"; // 设置最大高度以触发垂直滚动条
+        // editableArea.style.minHeight = "0";
 
-
-        // 通过 flex实现了，所以不需要事件了
-        // 监听panel大小变化事件，并相应调整editableArea大小
-        // const resizeObserver = new ResizeObserver(entries => {
-        //     for (let entry of entries) {
-        //         const { width, height } = entry.contentRect;
-        //         editableArea.style.width = width + 'px';
-        //         editableArea.style.height = height + 'px';
-        //         console.log('right panel size:' + width + '  ' + height);
-        //     }
-        // });
-
-        // resizeObserver.observe(this.rightPanel);
-
+        // 添加事件,如果滚动条被手动移动了,则不再自动滚动
+        editableArea.addEventListener('scroll', function () {
+            this.scrollTopEnabled = false;
+        });
         return editableArea;
-    }
-
-    static createOutputTextBoxByInput() {
-        // 创建一个 input 元素作为可编辑区域
-        const editableInput = document.createElement('input');
-
-        // 设置 input 元素的类型为文本
-        editableInput.type = 'text';
-
-        // 设置 input 元素的样式
-        editableInput.style.width = '340px'; // 设置固定宽度
-        editableInput.style.border = '1px solid #ccc'; // 边框样式
-        editableInput.style.padding = '5px'; // 内边距
-        editableInput.style.boxSizing = 'border-box'; // 盒模型
-        editableInput.style.flexGrow = "1"; // 占据剩余空间
-
-        // 设置 input 元素的其他样式或属性，如最大高度等
-        editableInput.style.overflowY = 'auto'; // 隐藏垂直滚动条
-
-        return editableInput;
     }
 
 
@@ -345,11 +320,9 @@ class ControlPanel {
         this.rightWidth = "63%";
 
 
-        // 添加鼠标事件监听器以实现面板拖动
-        this.isDragging = false;
-        // 是否开启尺寸修改
-        this.resizeable = false
-
+        this.isDragging = false;// 添加鼠标事件监听器以实现面板拖动
+        this.resizeable = false; // 是否开启尺寸修改
+        this.scrollTopEnabled = true;//是否允许滚动条自动滚动
 
         this.favBtns = favBtns;
         this.favulList = favulList;
@@ -360,35 +333,57 @@ class ControlPanel {
         this.btnContainer = this.cretaeButtonContainer();
         // this.favContainer = this.createFavContainer();
         this.favContainer = this.createFavPanel();
-// 这里很神奇，因为btnContainer是一个普通 <div>， 里面包含了一个 btnPanel 的 <div>
-// 但是我把 favContainer 直接赋值为 favPanel， 不再单独包裹一个 <div>， 因为普通的 div 好像会占据全部的高度。我给 favPanel设置的是可以有滚动条，所以不能原本是多高就多高，要可以滚动
+        // 这里很神奇，因为btnContainer是一个普通 <div>， 里面包含了一个 btnPanel 的 <div>
+        // 但是我把 favContainer 直接赋值为 favPanel， 不再单独包裹一个 <div>， 因为普通的 div 好像是原来多高就多高，会占据全部的高度。我给 favPanel设置的是可以有滚动条，所以不能原本是多高就多高，要可以滚动
         const leftPanel = CreateElemClass.createSubDiv("left-panel", "left");
         leftPanel.appendChild(this.btnContainer);
         leftPanel.appendChild(this.favContainer);
-        leftPanel.style.flexGrow = "0";
-        // leftPanel.style.display = "flex"
+        leftPanel.style.flexGrow = "0"; // 当floatingPanel向右侧增大的时候，按钮和收藏夹面板不增大，该是多少就多少
+
+        // leftPanel.style.overflow = "auto";
+        // 这样如果没有面板最小宽度和高度，那么Lefpanel也可以一直缩小，并且可以出现滚动条
 
         // left and right set background color
         leftPanel.style.backgroundColor = "green";
 
-        // leftPanel.style.color = "green";
         return leftPanel;
     }
 
     createRightPanel() {
+
+        const textContainer = document.createElement("div");
+        const textDiv = CreateElemClass.createSubDiv("div");
+        // textDiv.style.justifyContent = "space-between";
+
+        const hintText = document.createElement("h3");
+        // hintText.style.color = "red";
+        hintText.style.fontWeight = "bold";
+        hintText.textContent = "输出信息";
+
+        textDiv.appendChild(hintText);
+        textContainer.appendChild(textDiv);
+
+
         this.outputTextBox = CreateElemClass.createOutputTextBox();
-        //OUTPUTTEXTBOX set color 粉色
         this.outputTextBox.style.backgroundColor = "pink";
 
         const rightPanel = CreateElemClass.createSubDiv("right-panel", "right");
+        rightPanel.style.backgroundColor = "yellow";
+        rightPanel.style.overflowX = "hidden";
+        // rightPanel.style.minWidth = "200px";
+        rightPanel.style.flexDirection = 'column';
+        rightPanel.appendChild(textContainer);
         rightPanel.appendChild(this.outputTextBox);
 
-        //让 this.rightPanel 的宽度随着this.floatingPanel的大小更改而改变
-        rightPanel.style.flexGrow = "1";
-        rightPanel.style.display = "flex"
+        // 这句比较关键，这样右侧面板在最开始就可以缩小，而不是一直占据初始的最小宽度
+        //如果将 outputTextBox de flex-grow 设置为0, 那么它就不会自动增长,这时候 rightpanel扩大会看到多出来的rightPanel的背景色
 
-        rightPanel.style.backgroundColor = "yellow";
-        // this.rightPanel.style.color = "yellow";
+
+
+        // const rightPanel = document.createElement("div");
+        // rightPanel.appendChild(this.outputTextBox);
+
+        // return this.outputTextBox;
         return rightPanel;
     }
 
@@ -416,8 +411,8 @@ class ControlPanel {
         });
         // const selectAllButton = CreateElemClass.createButton("点我全选", EventListeners.toggleSelectAll.bind(this));
 
-        const startBatchTransferButton = CreateElemClass.createButton("开始批量转移");
-        const startTransferCurrentButton = CreateElemClass.createButton("开始转移当前收藏夹");
+        const startBatchTransferButton = CreateElemClass.createButton("开始批量复制");
+        const startTransferCurrentButton = CreateElemClass.createButton("开始复制当前收藏夹");
         const minimizeButton = CreateElemClass.createButton("点我最小化", EventListeners.toggleMinimize.bind(this), "minimize-btn");
         const destroyButton = CreateElemClass.createButton('点我销毁', () => {
             this.floatingPanel.remove();
@@ -458,7 +453,7 @@ class ControlPanel {
         const favPanel = CreateElemClass.createSubDiv("fav-panel");
         // set background color
         favPanel.style.backgroundColor = "red";
-
+        // favPanel.style.height='400px'
         // favPanel自动添加滚动条
         favPanel.style.overflow = "auto";
         favPanel.style.flexDirection = 'column';
@@ -536,7 +531,8 @@ class ControlPanel {
             this.minW = this.leftPanel.offsetWidth;
             this.minH = this.originFPH;
             this.minH = this.btnPanel.offsetHeight;
-            console.log('原始按钮面板高度:' + this.btnPanel.offsetHeight)
+            // this.minH = 10;
+            // console.log('原始按钮面板高度:' + this.btnPanel.offsetHeight)
         }
 
 
@@ -550,26 +546,12 @@ class ControlPanel {
     }
 
     recordHiddenPanelSize() {
-        this.hiddenRPW = this.rightPanel.offsetWidth;
-        this.hiddenRPH = this.rightPanel.offsetHeight;
+        this.hiddenWidth = this.floatingPanel.offsetWidth;
+        this.hiddenHeight = this.floatingPanel.offsetHeight;
     }
 
 
-    minimizeUpdatePanel() {
-        if (this.rightPanel.offsetWidth === 0) {
-            //隐藏了右手面板
-            this.minW = this.minW - this.originRPW;
-            const newW = this.floatingPanel.offsetWidth - this.hiddenRPW;
-            // this.outputTextBox.style.width = '0px';
-            this.floatingPanel.style.width = newW + "px";
-        } else {
-            //显示了右手面板
-            this.minW = this.originFPW;
-            console.log("最小化前rightW:" + this.hiddenRPW +"现在的面板宽度:" + this.floatingPanel.offsetWidth);
-            this.floatingPanel.style.width = this.floatingPanel.offsetWidth + this.hiddenRPW + "px";
-            console.log("显示后总宽度:" + this.floatingPanel.offsetWidth);
-        }
-    }
+
 
     judgePanelSizeAndUpdate(newLeft, newTop, newWidth, newHeight, originTop, originLeft) {
 
@@ -598,7 +580,8 @@ class ControlPanel {
             newLeft = originLeft;
         }
 
-        console.log("最小height: " + this.minH, " 新height: " + newHeight);
+        // console.log("最小height: " + this.minH, " 新height: " + newHeight);
+
         if (newHeight < this.minH) {
             newHeight = this.minH;
             newTop = originTop;
@@ -658,12 +641,10 @@ class ControlPanel {
         floP.style.zIndex = "99999";
 
         // floP.style.overflow = "auto";
+        // 如果添加了 overflow, 那么缩小面板的时候底下会有滚动条
+
         floP.style.display = "flex";
 
-
-        //可以手动移动面板
-        // floP.style.userSelect = "none";
-        // floP.style.cursor = "move";
 
 
         floP.addEventListener('mousedown', EventListeners.mouseDown.bind(this));
@@ -710,6 +691,7 @@ class ControlPanel {
         let formattedDate = currentDate.toISOString().replace(/T/, ' ').replace(/\..+/, '');
 
         let textColor;
+        let brCnt = 1;
         switch (type) {
             case this.errorCode:
                 textColor = 'red';
@@ -717,15 +699,20 @@ class ControlPanel {
             case this.normalCode:
                 textColor = 'black';
                 break;
-            case this.startBatchCode:
-                info += "\n\n";
             case this.endBatchCode:
+                brCnt++;
+            case this.startBatchCode:
+                brCnt++;
                 textColor = 'blue';
                 break;
-            case this.startSingleCode:
-                info += "\n";
             case this.endSingleCode:
+                brCnt++;
+            case this.startSingleCode:
                 textColor = 'green';
+                break;
+            case this.onePageCode:
+                textColor = 'purple';
+                info+="--------------";
                 break;
             default:
                 textColor = 'black'; // 默认为黑色
@@ -739,10 +726,15 @@ class ControlPanel {
 
         // 将新内容追加到 textarea
         textarea.appendChild(span);
-        textarea.appendChild(document.createElement('br')); // 换行
+        for (let i = 0; i < brCnt; i++) {
+            textarea.appendChild(document.createElement('br'));
+        }
+
 
         // Scroll to the bottom
-        textarea.scrollTop = textarea.scrollHeight;
+        if (this.scrollTopEnabled) {
+            textarea.scrollTop = textarea.scrollHeight;
+        }
     }
 
 
@@ -751,7 +743,7 @@ class ControlPanel {
 class BatchTransfer {
 
     constructor() {
-        this.usage = "Hi，这是一个Bilibili 收藏夹管理工具，可以批量转移保存其他人的收藏夹视频，也可以批量转移自己的收藏夹视频（还未实现）。";
+        this.usage = "Hi，这是一个Bilibili 收藏夹管理工具，可以批量复制保存其他人的收藏夹视频，也可以批量复制自己的收藏夹视频（还未实现）。";
         this.delayTimeShort = 500;
         this.delayTimeMiddle = 1000;
         // 消息类型
@@ -821,7 +813,7 @@ class BatchTransfer {
         this.selectedItems = this.ctl.getSelectedItems();
 
         await this.delay(this.delayTimeShort);
-        this.ctl.appendInfo("开始批量转移", this.startBatchCode);
+        this.ctl.appendInfo("开始批量复制", this.startBatchCode);
 
         for (const item of this.selectedItems) {
             let srcFav = item.getLabelValue();
@@ -840,7 +832,7 @@ class BatchTransfer {
             await this.transferOneFav(srcFav, dstFav);
         }
 
-        this.ctl.appendInfo("批量转移结束", this.endBatchCode);
+        this.ctl.appendInfo("批量复制结束", this.endBatchCode);
 
     }
 
@@ -854,16 +846,16 @@ class BatchTransfer {
         }
 
         const totalPagesElement = document.querySelector('.be-pager-item[title^="最后一页"]');
-        const totalPages = totalPagesElement ? parseInt(totalPagesElement.textContent.trim().split(':')[0]) : 0;
+        const totalPages = totalPagesElement ? parseInt(totalPagesElement.textContent.trim().split(':')[0]) : 1; // 1页的时候不显示
 
-        this.ctl.appendInfo("开始转移收藏夹" + sourceFavName + "到" + targetFavName, ",一共" + totalPages + "页", this.startSingleCode);
+        this.ctl.appendInfo("开始复制收藏夹[" + sourceFavName + "]到[" + targetFavName + "],一共" + totalPages + "页", this.startSingleCode);
 
         // 点击批量操作按钮
         let batchOperationButton = document.querySelector('.filter-item.do-batch .text');
         if (batchOperationButton && batchOperationButton.textContent.trim() === "批量操作") {
             batchOperationButton.click();
         } else {
-            this.ctl.appendInfo("Error!!! 找不到'批量操作'按钮或按钮文本不匹配", this.errorCode);
+            this.ctl.appendInfo("Error!!! 找不到[批量操作]按钮或按钮文本不匹配", this.errorCode);
 
         }
         await this.delay(this.delayTimeShort);
@@ -879,17 +871,17 @@ class BatchTransfer {
         }
 
         if (currentPage > totalPages || totalPages == 0) {
-            this.ctl.appendInfo("收藏夹" + sourceFavName + "转移到" + targetFavName + "结束", this.endSingleCode);
+            this.ctl.appendInfo("收藏夹[" + sourceFavName + "]复制到[" + targetFavName + "]结束", this.endSingleCode);
             return;
         }
 
-        this.ctl.appendInfo("正在保存第" + currentPage + "页");
+        this.ctl.appendInfo("正在保存第" + currentPage + "页", this.onePageCode);
 
-        this.ctl.appendInfo("点击'全选'按钮");
+        this.ctl.appendInfo("点击[全选]按钮");
         document.querySelector('.icon-selece-all').parentNode.click();
         await this.delay(this.delayTimeShort);
 
-        this.ctl.appendInfo("点击'复制到'按钮");
+        this.ctl.appendInfo("点击[复制到]按钮");
         document.querySelector('.icon-copy').parentNode.click();
         await this.delay(this.delayTimeShort);
 
@@ -904,24 +896,24 @@ class BatchTransfer {
         });
 
         if (!hasSameNameFav) {
-            this.ctl.appendInfo("创建新的收藏夹：" + targetFavName);
-            this.ctl.appendInfo("点击'新建收藏夹'按钮");
+            this.ctl.appendInfo("创建新的收藏夹：[" + targetFavName + "]");
+            this.ctl.appendInfo("点击[新建收藏夹]按钮");
             document.querySelector('.fake-fav-input').click();
             await this.delay(this.delayTimeMiddle);
 
-            this.ctl.appendInfo("输入新收藏夹名称：" + targetFavName);
+            this.ctl.appendInfo("输入新收藏夹名称：[" + targetFavName + "]");
             const inputText = document.querySelector('.add-fav-input');
             inputText.value = targetFavName;
             inputText.dispatchEvent(new Event('input', { bubbles: true }));
             await this.delay(this.delayTimeShort);
 
-            this.ctl.appendInfo("点击'新建'按钮");
+            this.ctl.appendInfo("点击[新建]按钮");
             document.querySelector('.fav-add-btn').click();
         }
 
         await this.delay(this.delayTimeShort);
 
-        this.ctl.appendInfo("点击目标收藏夹：" + targetFavName);
+        this.ctl.appendInfo("点击目标收藏夹：[" + targetFavName + "]");
         const favListContainer = document.querySelector('.target-favlist-container');
         const favItems = favListContainer.querySelectorAll('.target-favitem');
 
@@ -935,14 +927,19 @@ class BatchTransfer {
 
         await this.delay(this.delayTimeShort);
 
-        this.ctl.appendInfo("点击'确定'");
+        this.ctl.appendInfo("点击[确定]");
         const panel = document.querySelector('.edit-video-modal');
         const confirmBtn = panel.querySelector('.btn-content');
         confirmBtn.click();
         await this.delay(this.delayTimeShort);
 
-        this.ctl.appendInfo("点击'下一页'按钮");
+        this.ctl.appendInfo("点击[下一页]按钮");
         const nextPageBtn = document.querySelector('.be-pager-next');
+        if(!nextPageBtn){
+            this.ctl.appendInfo("Error!!! 找不到[下一页]按钮,判断为单页收藏夹.", this.errorCode);
+            this.ctl.appendInfo("收藏夹[" + sourceFavName + "]复制到[" + targetFavName + "]结束", this.endSingleCode);
+            return;
+        }
         nextPageBtn.click();
         await this.delay(this.delayTimeMiddle);
         await this.saveCollection(currentPage + 1, totalPages, sourceFavName, targetFavName);
