@@ -5,7 +5,7 @@ email: ljx.1024@outlook.com
 
 https://github.com/junxian-li-hpc/bilibili-favs-manage
 
-# initial publish version
+# initial publish version v0.1
 2024-02-13
 使用方法，打开要转移的网页，3秒后会弹出窗口，之所以3秒是因为脚本会自动从网页中获取收藏夹的名字，所以要确保网页加载完毕，这一点之后可以优化为一个刷新按钮。
 然后左下角会显示检测到的收藏夹，点击全选，然后点击开始批量转移，就可以自动进行转移。
@@ -31,12 +31,16 @@ https://github.com/junxian-li-hpc/bilibili-favs-manage
 如：统计自己收藏夹的内容，进行去重、导出链接；批量从一个收藏夹转移到另一个收藏夹。
 
 
-# 2024-02-15
+# 2024-02-15 v0.5
 可以自定义目标收藏夹了. 试着写了一下 ui,更改大小,移动位置等等.
 
 todo:
 判断目标收藏夹如果已满,则自动创建新的收藏夹.
 现在只是复制,可以添加移动到的功能.
+输出框在用户点击后,不再自动滚动.
 
 bugs:
 打开网页后就需要保持在这个状态不变,如果手动点了[批量操作],再执行脚本,就找不到[批量操作]这个按钮了.
+
+## 
+![picture 0](images/0ddd823b113b72a01a3bcbb0a0d33f61a7333127b9da31e2b2ca615904ddbbcb.png)  
