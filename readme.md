@@ -5,6 +5,8 @@ email: ljx.1024@outlook.com
 
 https://github.com/junxian-li-hpc/bilibili-favs-manage
 
+[Greasyfork - bilibili收藏夹批量复制](https://greasyfork.org/zh-CN/scripts/487232-bilibili-%E6%94%B6%E8%97%8F%E5%A4%B9%E6%89%B9%E9%87%8F%E5%A4%8C%E5%88%B6)
+
 # initial publish version v0.1
 2024-02-13
 使用方法，打开要转移的网页，3秒后会弹出窗口，之所以3秒是因为脚本会自动从网页中获取收藏夹的名字，所以要确保网页加载完毕，这一点之后可以优化为一个刷新按钮。
