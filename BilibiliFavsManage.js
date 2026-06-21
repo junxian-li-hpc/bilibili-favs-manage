@@ -1,3 +1,7 @@
+// ⚠️ DEPRECATED - 此文件已废弃，保留仅供参考
+// 新版本请使用模块化代码：src/ 目录
+// 构建产物：dist/BilibiliFavsManage.user.js
+//
 // 使用 await 和 async 实现批量复制收藏夹功能
 // Version: 1.0 - 适配新版 B 站收藏夹页面（VUI 组件库）
 // 更新日期: 2026-06-22

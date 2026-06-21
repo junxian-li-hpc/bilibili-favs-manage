@@ -320,4 +320,38 @@ export class BilibiliAPI {
     error(`找不到收藏夹：[${favName}]`);
     return false;
   }
+
+  /**
+   * 检查批量模式是否激活
+   * @returns {boolean}
+   */
+  static isBatchModeActive() {
+    const checkbox = document.querySelector(SELECTORS.SELECT_ALL_CHECKBOX);
+    return !!checkbox;
+  }
+
+  /**
+   * 确保批量模式激活
+   * @returns {Promise<boolean>}
+   */
+  static async ensureBatchModeActive() {
+    if (this.isBatchModeActive()) {
+      log('批量模式已激活');
+      return true;
+    }
+
+    log('批量模式已退出，重新进入');
+    return await this.clickBatchOperationButton();
+  }
+
+  /**
+   * 检查目标收藏夹是否存在（在对话框中）
+   * @param {Element} dialog - 对话框
+   * @param {string} favName - 收藏夹名称
+   * @returns {boolean}
+   */
+  static isFavoriteExistInDialog(dialog, favName) {
+    const favList = this.getFavoriteListInDialog(dialog);
+    return favList.some(fav => fav.name === favName);
+  }
 }

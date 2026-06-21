@@ -1,9 +1,10 @@
 /**
  * BiliBili 收藏夹批量管理工具 - 入口文件
- * Version: 1.0
+ * Version: 1.1
  */
 
 import { FavoriteManager } from './core/FavoriteManager.js';
+import { PageDetector } from './core/PageDetector.js';
 import { log } from './utils/logger.js';
 
 // 等待页面加载完成
@@ -21,7 +22,7 @@ function waitForPageLoad() {
 async function main() {
   await waitForPageLoad();
 
-  log('脚本启动');
+  log('脚本启动 v1.1');
 
   // 创建管理器实例
   const manager = new FavoriteManager();
@@ -31,6 +32,13 @@ async function main() {
     log('页面版本不支持，脚本退出');
     return;
   }
+
+  // 检测页面类型
+  const isOwnPage = PageDetector.isOwnPage();
+  log('页面类型:', isOwnPage ? '我的收藏夹' : '他人的收藏夹');
+
+  // 🆕 检查是否需要恢复跨页面流程
+  await manager.resumeCrossPageFlow();
 
   // 获取所有收藏夹名称
   const favorites = manager.getAllFavoriteNames();

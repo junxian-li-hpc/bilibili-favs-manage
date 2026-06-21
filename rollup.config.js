@@ -1,6 +1,6 @@
 import resolve from '@rollup/plugin-node-resolve';
 import banner from 'rollup-plugin-banner2';
-import { terser } from 'rollup-plugin-terser';
+import terser from '@rollup/plugin-terser';
 
 export default {
   input: 'src/main.js',
@@ -15,8 +15,8 @@ export default {
       return `// ==UserScript==
 // @name         Bilibili 收藏夹批量管理
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  批量复制 B 站收藏夹（适配新版 VUI 组件库）
+// @version      1.1
+// @description  批量复制 B 站收藏夹（适配新版 VUI + 跨页面流程）
 // @author       Your Name
 // @match        https://space.bilibili.com/*/favlist*
 // @grant        none
