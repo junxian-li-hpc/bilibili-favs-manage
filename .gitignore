@@ -8,6 +8,12 @@
 .trellis/.runtime/
 .trellis/.cache/
 
+# Trellis research files with potential sensitive content
+.trellis/tasks/archive/**/research/*.png
+.trellis/tasks/archive/**/research/*.jpg
+.trellis/tasks/archive/**/research/*.txt
+.trellis/tasks/archive/**/research/*snapshot*
+
 # Node modules
 node_modules/
 
