@@ -1,9 +1,9 @@
 // 使用 await 和 async 实现批量复制收藏夹功能
-// Version: 0.6 - 适配新版 B 站收藏夹页面（VUI 组件库）
+// Version: 1.0 - 适配新版 B 站收藏夹页面（VUI 组件库）
 // 更新日期: 2026-06-22
 // 主要改动：更新所有 DOM 选择器以适配新版页面结构
 
-console.log('[BiliBili Favs] 脚本版本: v0.6 - 新版适配');
+console.log('[BiliBili Favs] 脚本版本: v1.0 - 新版适配');
 console.log('[BiliBili Favs] 检测页面版本...');
 
 const isNewVersion = !!document.querySelector('.favlist-aside');
@@ -211,7 +211,7 @@ class CreateElemClass {
         editableArea.style.padding = '5px'; // 内边距
         editableArea.style.boxSizing = 'border-box'; // 盒模型
         editableArea.style.whiteSpace = 'nowrap'; // 设置不允许折行显示
-        editableArea.style.minWidth = "400px";
+        editableArea.style.minWidth = "300px";
         editableArea.contentEditable = true; // 设置为可编辑
         editableArea.style.flexGrow = "1";
         // editableArea.style.display = 'flex';
@@ -320,6 +320,7 @@ class ControlPanel {
     createMembers(favBtns, favulList) {
         this.delayTimeShort = 500;
         this.delayTimeMiddle = 1000;
+        this.delayTimeLong = 2000;
         // 消息类型
         this.errorCode = 0;
         this.normalCode = 1;
@@ -328,6 +329,7 @@ class ControlPanel {
         this.endSingleCode = 4;
         this.endBatchCode = 5;
         this.onePageCode = 6;
+        this.warnCode = 7;
 
         this.leftWidth = "35%";
         this.rightWidth = "63%";
@@ -646,6 +648,8 @@ class ControlPanel {
         floP.style.position = "fixed";
         floP.style.top = "50px";
         floP.style.left = "50px";
+        floP.style.width = "600px";  // 初始宽度调整为 600px
+        floP.style.height = "500px"; // 初始高度调整为 500px
         floP.style.backgroundColor = "#ffffff";
         floP.style.border = "0px solid #ccc";
         floP.style.borderRadius = "5px";
