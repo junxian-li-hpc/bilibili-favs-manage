@@ -1,0 +1,56 @@
+/**
+ * BiliBili 收藏夹批量管理工具 - 入口文件
+ * Version: 1.0
+ */
+
+import { FavoriteManager } from './core/FavoriteManager.js';
+import { log } from './utils/logger.js';
+
+// 等待页面加载完成
+function waitForPageLoad() {
+  return new Promise(resolve => {
+    if (document.readyState === 'complete') {
+      resolve();
+    } else {
+      window.addEventListener('load', resolve);
+    }
+  });
+}
+
+// 主函数
+async function main() {
+  await waitForPageLoad();
+
+  log('脚本启动');
+
+  // 创建管理器实例
+  const manager = new FavoriteManager();
+
+  // 初始化并检测页面版本
+  if (!manager.initialize()) {
+    log('页面版本不支持，脚本退出');
+    return;
+  }
+
+  // 获取所有收藏夹名称
+  const favorites = manager.getAllFavoriteNames();
+  log('检测到收藏夹:', favorites.length, '个');
+
+  if (favorites.length > 0) {
+    log('收藏夹列表:', favorites.slice(0, 5).join(', '), favorites.length > 5 ? '...' : '');
+  }
+
+  // 将管理器实例挂载到全局，方便控制台调用
+  window.BiliFavManager = manager;
+
+  log('脚本已就绪！');
+  log('使用方法:');
+  log('1. 复制单个收藏夹: await BiliFavManager.copyFavorite("源收藏夹", "目标收藏夹")');
+  log('2. 批量复制: await BiliFavManager.batchCopy([{source: "源1", target: "目标1"}, ...])');
+  log('3. 获取收藏夹列表: BiliFavManager.getAllFavoriteNames()');
+}
+
+// 启动脚本
+main().catch(err => {
+  console.error('[BiliBili Favs] 脚本启动失败:', err);
+});
