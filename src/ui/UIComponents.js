@@ -55,4 +55,91 @@ export class UIComponents {
 
     return subPanel;
   }
+
+  /**
+   * 创建下拉选择框
+   * @param {Array<string>} options - 选项列表
+   * @param {string} defaultValue - 默认值
+   * @returns {HTMLSelectElement}
+   */
+  static createSelect(options, defaultValue = '') {
+    const select = document.createElement('select');
+    select.style.width = '100%';
+    select.style.padding = '5px';
+    select.style.fontSize = '14px';
+    select.style.border = '1px solid #ccc';
+    select.style.borderRadius = '3px';
+
+    // Add empty option if no options provided
+    if (options.length === 0) {
+      const emptyOption = document.createElement('option');
+      emptyOption.value = '';
+      emptyOption.textContent = '(无收藏夹)';
+      select.appendChild(emptyOption);
+      return select;
+    }
+
+    for (const option of options) {
+      const optionElem = document.createElement('option');
+      optionElem.value = option;
+      optionElem.textContent = option;
+      if (option === defaultValue) {
+        optionElem.selected = true;
+      }
+      select.appendChild(optionElem);
+    }
+
+    return select;
+  }
+}
+
+/**
+ * 复选框项组件
+ */
+export class CheckboxItem {
+  constructor(favName) {
+    this.checkboxContainer = this.createCheckboxContainer(favName);
+    this.checkbox = this.checkboxContainer.querySelector("input[type='checkbox']");
+    this.label = this.checkboxContainer.querySelector('label');
+    this.inputText = this.checkboxContainer.querySelector("input[type='text']");
+  }
+
+  createCheckboxContainer(favName) {
+    const checkboxContainer = document.createElement('div');
+    const checkboxDiv = UIComponents.createSubDiv('signal-panel');
+    checkboxDiv.style.justifyContent = 'space-between';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `checkbox-${favName}`;
+
+    const label = document.createElement('label');
+    label.textContent = favName;
+    label.setAttribute('for', `checkbox-${favName}`);
+
+    const inputText = document.createElement('input');
+    inputText.type = 'text';
+    inputText.value = favName;
+    inputText.style.textAlign = 'center';
+
+    checkboxDiv.appendChild(checkbox);
+    checkboxDiv.appendChild(label);
+    checkboxDiv.appendChild(inputText);
+
+    checkboxContainer.appendChild(checkboxDiv);
+
+    return checkboxContainer;
+  }
+
+  getLabelValue() {
+    return this.label.textContent;
+  }
+
+  getInputTextValue() {
+    return this.inputText.value;
+  }
+
+  getCheckboxValue() {
+    return this.checkbox.checked;
+  }
 }

@@ -1,8 +1,20 @@
 /**
  * 日志工具
+ * 支持同时输出到控制台和浮动面板
  */
 
 const LOG_PREFIX = '[BiliBili Favs]';
+
+// 全局面板引用（由 FloatingPanel 设置）
+let globalPanel = null;
+
+/**
+ * 设置全局面板引用
+ * @param {Object} panel - FloatingPanel 实例
+ */
+export function setLoggerPanel(panel) {
+  globalPanel = panel;
+}
 
 /**
  * 输出普通日志
@@ -10,6 +22,9 @@ const LOG_PREFIX = '[BiliBili Favs]';
  */
 export function log(...args) {
   console.log(LOG_PREFIX, ...args);
+  if (globalPanel) {
+    globalPanel.appendLog(args.join(' '), globalPanel.normalCode);
+  }
 }
 
 /**
@@ -18,6 +33,9 @@ export function log(...args) {
  */
 export function error(...args) {
   console.error(LOG_PREFIX, ...args);
+  if (globalPanel) {
+    globalPanel.appendLog(args.join(' '), globalPanel.errorCode);
+  }
 }
 
 /**
@@ -26,6 +44,9 @@ export function error(...args) {
  */
 export function warn(...args) {
   console.warn(LOG_PREFIX, ...args);
+  if (globalPanel) {
+    globalPanel.appendLog(args.join(' '), globalPanel.warnCode);
+  }
 }
 
 /**
