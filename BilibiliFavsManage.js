@@ -1,4 +1,17 @@
 // 使用 await 和 async 实现批量复制收藏夹功能
+// Version: 0.6 - 适配新版 B 站收藏夹页面（VUI 组件库）
+// 更新日期: 2026-06-22
+// 主要改动：更新所有 DOM 选择器以适配新版页面结构
+
+console.log('[BiliBili Favs] 脚本版本: v0.6 - 新版适配');
+console.log('[BiliBili Favs] 检测页面版本...');
+
+const isNewVersion = !!document.querySelector('.favlist-aside');
+console.log('[BiliBili Favs] 页面版本:', isNewVersion ? '新版 (VUI)' : '未知版本');
+
+if (!isNewVersion) {
+    console.warn('[BiliBili Favs] 警告：页面结构可能不受支持，脚本可能无法正常工作');
+}
 
 class EventListeners {
 
@@ -785,29 +798,40 @@ class BatchTransfer {
 
 
     getAllFavLinks() {
-        // 获取包含所需信息的父元素
-        let parentElement = document.getElementById('fav-createdList-container');
-        // 获取所有包含 href 属性的 a 标签
-        let links = parentElement.querySelectorAll('a[href]');
-        return links;
+        // 新版 B 站使用 VUI 组件库
+        let parentElement = document.querySelector('.favlist-aside');
+        if (!parentElement) {
+            console.error('[BiliBili Favs] 找不到收藏夹侧边栏容器 .favlist-aside');
+            return [];
+        }
+        // 获取所有收藏夹项
+        let items = parentElement.querySelectorAll('.vui_sidebar-item');
+        return items;
     }
 
     getAllFavBtns() {
-        let buttons = document.querySelectorAll('#fav-createdList-container .fav-item a');
+        // 新版 B 站使用 VUI 组件库
+        let buttons = document.querySelectorAll('.favlist-aside .vui_sidebar-item');
+        if (buttons.length === 0) {
+            console.error('[BiliBili Favs] 找不到收藏夹列表');
+        }
         return buttons;
-        // 模拟点击每一个按钮
-        buttons.forEach(function (button) {
-            button.click(); // 模拟点击
-        });
     }
     iterateFavs() {
-        //在floatingPanel中添加多选按钮，将favBtns中的收藏夹名字全部列出来，让用户自己选择需要保存哪些收藏夹。favBtns中每个按钮有title属性，使用 <ul>添加到floatingPanel中，每个ul都选中
+        // 在 floatingPanel 中添加多选按钮，将 favBtns 中的收藏夹名字全部列出来
         let favulList = []
         for (const btn of this.favBtns) {
-            const ul = document.createElement("ul");
-            ul.innerHTML = "<input type='checkbox' id='checkBox' name='checkBox' value='" + btn.title + "' />" + btn.title;
-            favulList.push(ul);
+            // 新版：从嵌套结构中提取收藏夹名称
+            const titleEl = btn.querySelector('.vui_sidebar-item-title .vui_ellipsis');
+            const favName = titleEl ? titleEl.textContent.trim() : '';
+
+            if (favName) {
+                const ul = document.createElement("ul");
+                ul.innerHTML = "<input type='checkbox' id='checkBox' name='checkBox' value='" + favName + "' />" + favName;
+                favulList.push(ul);
+            }
         }
+        console.log('[BiliBili Favs] 找到收藏夹数量:', favulList.length);
         return favulList;
     }
 
@@ -832,11 +856,18 @@ class BatchTransfer {
             // get the btn has srcFav
             let btn = null;
             this.favBtns.forEach(function (button) {
-                if (button.title === srcFav) {
+                // 新版：从嵌套结构中提取名称并比对
+                const titleEl = button.querySelector('.vui_sidebar-item-title .vui_ellipsis');
+                const favName = titleEl ? titleEl.textContent.trim() : '';
+                if (favName === srcFav) {
                     btn = button;
                     return;
                 }
             });
+            if (!btn) {
+                this.ctl.appendInfo(`Error: 找不到收藏夹 [${srcFav}]`, this.errorCode);
+                continue;
+            }
             btn.click();
             await this.delay(this.delayTimeShort);
             await this.transferOneFav(srcFav, dstFav);
@@ -849,19 +880,27 @@ class BatchTransfer {
     async transferOneFav(sourceFavName, targetFavName) {
 
         if (sourceFavName === undefined) {
-            const sourceFavName = document.querySelector('.favInfo-details .fav-name').textContent.trim();
+            // 新版：从标题行获取当前收藏夹名称
+            const titleEl = document.querySelector('.favlist-info-detail__title-row');
+            if (!titleEl) {
+                this.ctl.appendInfo('Error: 无法获取当前收藏夹名称', this.errorCode);
+                return;
+            }
+            sourceFavName = titleEl.textContent.trim();
         }
         if (targetFavName === undefined) {
-            const targetFavName = sourceFavName;
+            targetFavName = sourceFavName;
         }
 
-        const totalPagesElement = document.querySelector('.be-pager-item[title^="最后一页"]');
-        const totalPages = totalPagesElement ? parseInt(totalPagesElement.textContent.trim().split(':')[0]) : 1; // 1页的时候不显示
+        // 新版：从分页组件获取总页数
+        const pageInfoText = document.querySelector('.vui_pagenation')?.textContent || '';
+        const match = pageInfoText.match(/共\s*(\d+)\s*页/);
+        const totalPages = match ? parseInt(match[1]) : 1;
 
         this.ctl.appendInfo("开始复制收藏夹[" + sourceFavName + "]到[" + targetFavName + "],一共" + totalPages + "页", this.startSingleCode);
 
-        // 点击批量操作按钮
-        let batchOperationButton = document.querySelector('.filter-item.do-batch .text');
+        // 点击批量操作按钮（新版）
+        let batchOperationButton = document.querySelector('.vui_button.favlist-info-batch');
         if (batchOperationButton && batchOperationButton.textContent.trim() === "批量操作") {
             batchOperationButton.click();
         } else {
@@ -888,71 +927,197 @@ class BatchTransfer {
         this.ctl.appendInfo("正在保存第" + currentPage + "页", this.onePageCode);
 
         this.ctl.appendInfo("点击[全选]按钮");
-        document.querySelector('.icon-selece-all').parentNode.click();
+        const selectAllCheckbox = document.querySelector('.vui_checkbox');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.click();
+        } else {
+            this.ctl.appendInfo('Error: 找不到全选按钮', this.errorCode);
+            return;
+        }
         await this.delay(this.delayTimeShort);
 
-        this.ctl.appendInfo("点击[复制到]按钮");
-        document.querySelector('.icon-copy').parentNode.click();
+        this.ctl.appendInfo("点击[复制至]按钮");
+        // 通过文本内容查找按钮
+        const allButtons = document.querySelectorAll('button');
+        let copyBtn = null;
+        for (const btn of allButtons) {
+            if (btn.textContent.trim() === '复制至') {
+                copyBtn = btn;
+                break;
+            }
+        }
+
+        if (copyBtn) {
+            copyBtn.click();
+        } else {
+            this.ctl.appendInfo('Error: 找不到复制至按钮', this.errorCode);
+            return;
+        }
+        await this.delay(this.delayTimeLong); // 等待弹窗出现
+
+        // 新版：查找主弹窗
+        const dialog = document.querySelector('.vui_dialog--content.fav-modify-modal-content');
+        if (!dialog) {
+            this.ctl.appendInfo('Error: 找不到收藏夹选择弹窗', this.errorCode);
+            return;
+        }
+
         await this.delay(this.delayTimeShort);
 
-        const targetFavList = document.querySelectorAll('.target-favlist-container .fav-name');
+        // 新版：获取收藏夹列表
+        const targetFavList = dialog.querySelectorAll('.modify-fav-item__title');
+        if (targetFavList.length === 0) {
+            this.ctl.appendInfo('Error: 弹窗中没有收藏夹列表', this.errorCode);
+            return;
+        }
+
         let hasSameNameFav = false;
-
-        targetFavList.forEach(function (targetFav) {
-            if (targetFav.textContent.trim() === targetFavName) {
+        targetFavList.forEach((titleEl) => {
+            if (titleEl.textContent.trim() === targetFavName) {
                 hasSameNameFav = true;
-                return;
             }
         });
 
         if (!hasSameNameFav) {
             this.ctl.appendInfo("创建新的收藏夹：[" + targetFavName + "]");
+
+            // 新版：点击新建收藏夹按钮
             this.ctl.appendInfo("点击[新建收藏夹]按钮");
-            document.querySelector('.fake-fav-input').click();
+            const createBtn = dialog.querySelector('.modify-fav-add');
+            if (!createBtn) {
+                this.ctl.appendInfo('Error: 找不到新建收藏夹按钮', this.errorCode);
+                return;
+            }
+            createBtn.click();
             await this.delay(this.delayTimeMiddle);
 
+            // 新版：输入收藏夹名称（需要完整的事件链）
             this.ctl.appendInfo("输入新收藏夹名称：[" + targetFavName + "]");
-            const inputText = document.querySelector('.add-fav-input');
-            inputText.value = targetFavName;
-            inputText.dispatchEvent(new Event('input', { bubbles: true }));
+            const nameInput = document.querySelector('input.add-fav-input');
+            if (!nameInput) {
+                this.ctl.appendInfo('Error: 找不到名称输入框', this.errorCode);
+                return;
+            }
+
+            // 模拟真实输入
+            nameInput.focus();
+            nameInput.value = '';
+            nameInput.dispatchEvent(new Event('focus', { bubbles: true }));
+
+            for (let i = 0; i < targetFavName.length; i++) {
+                const char = targetFavName[i];
+                nameInput.value += char;
+                nameInput.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+                nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                nameInput.dispatchEvent(new KeyboardEvent('keyup', { key: char, bubbles: true }));
+                await this.delay(50);
+            }
+            nameInput.dispatchEvent(new Event('change', { bubbles: true }));
+            nameInput.dispatchEvent(new Event('blur', { bubbles: true }));
+
             await this.delay(this.delayTimeShort);
 
-            this.ctl.appendInfo("点击[新建]按钮");
-            document.querySelector('.fav-add-btn').click();
+            // 新版：点击创建按钮
+            this.ctl.appendInfo("点击[创建]按钮");
+            const allBtns = document.querySelectorAll('button');
+            let createConfirmBtn = null;
+            for (const btn of allBtns) {
+                if (btn.textContent.trim() === '创建') {
+                    createConfirmBtn = btn;
+                    break;
+                }
+            }
+
+            if (!createConfirmBtn || createConfirmBtn.disabled) {
+                this.ctl.appendInfo('Error: 创建按钮不可用', this.errorCode);
+                return;
+            }
+            createConfirmBtn.click();
+            await this.delay(this.delayTimeMiddle); // 等待返回主对话框
         }
 
         await this.delay(this.delayTimeShort);
 
+        // 新版：选择目标收藏夹
         this.ctl.appendInfo("点击目标收藏夹：[" + targetFavName + "]");
-        const favListContainer = document.querySelector('.target-favlist-container');
-        const favItems = favListContainer.querySelectorAll('.target-favitem');
 
-        favItems.forEach(function (item) {
-            const folderNameElement = item.querySelector('.fav-name');
-            if (folderNameElement && folderNameElement.textContent.trim() === targetFavName) {
-                folderNameElement.click();
-                return;
+        // 确保在主对话框中
+        const mainDialog = document.querySelector('.vui_dialog--content.fav-modify-modal-content');
+        if (!mainDialog) {
+            this.ctl.appendInfo('Error: 主对话框消失了', this.errorCode);
+            return;
+        }
+
+        const favItems = mainDialog.querySelectorAll('.modify-fav-item');
+        let found = false;
+
+        for (const item of favItems) {
+            const titleEl = item.querySelector('.modify-fav-item__title');
+            if (titleEl && titleEl.textContent.trim() === targetFavName) {
+                this.ctl.appendInfo(`找到目标收藏夹：[${targetFavName}]`);
+
+                // 点击 radio 选中
+                const radio = item.querySelector('input[type="radio"]');
+                if (radio) {
+                    radio.click();
+                    found = true;
+                    break;
+                }
             }
-        });
+        }
+
+        if (!found) {
+            this.ctl.appendInfo(`Warning: 未找到收藏夹 [${targetFavName}]`, this.warnCode);
+        }
 
         await this.delay(this.delayTimeShort);
 
+        // 新版：点击确定按钮
         this.ctl.appendInfo("点击[确定]");
-        const panel = document.querySelector('.edit-video-modal');
-        const confirmBtn = panel.querySelector('.btn-content');
+        const confirmBtn = mainDialog.querySelector('button.vui_button--blue');
+        if (!confirmBtn) {
+            this.ctl.appendInfo('Error: 找不到确定按钮', this.errorCode);
+            return;
+        }
+
         confirmBtn.click();
-        await this.delay(this.delayTimeShort);
+        await this.delay(this.delayTimeLong); // 等待复制完成
+
+        // 检查是否有成功提示
+        const toast = document.querySelector('.vui_toast');
+        if (toast && toast.textContent.includes('成功')) {
+            this.ctl.appendInfo('✓ 复制成功');
+        }
 
         this.ctl.appendInfo("点击[下一页]按钮");
-        const nextPageBtn = document.querySelector('.be-pager-next');
-        if(!nextPageBtn){
-            this.ctl.appendInfo("Error!!! 找不到[下一页]按钮,判断为单页收藏夹.", this.errorCode);
+
+        // 新版：查找分页组件
+        const paginationEl = document.querySelector('.vui_pagenation');
+        if (!paginationEl) {
+            this.ctl.appendInfo("判断为单页收藏夹", this.infoCode);
             this.ctl.appendInfo("收藏夹[" + sourceFavName + "]复制到[" + targetFavName + "]结束", this.endSingleCode);
             return;
         }
-        nextPageBtn.click();
-        await this.delay(this.delayTimeMiddle);
-        await this.saveCollection(currentPage + 1, totalPages, sourceFavName, targetFavName);
+
+        // 查找下一页按钮 - 通过文本
+        const allPageButtons = paginationEl.querySelectorAll('button');
+        let nextBtn = null;
+        for (const btn of allPageButtons) {
+            const text = btn.textContent.trim();
+            if (text === '下一页' || text.includes('next') || text.includes('>')) {
+                nextBtn = btn;
+                break;
+            }
+        }
+
+        if (nextBtn && !nextBtn.disabled) {
+            nextBtn.click();
+            await this.delay(this.delayTimeMiddle);
+            await this.saveCollection(currentPage + 1, totalPages, sourceFavName, targetFavName);
+        } else {
+            this.ctl.appendInfo('已到最后一页', this.infoCode);
+            this.ctl.appendInfo("收藏夹[" + sourceFavName + "]复制到[" + targetFavName + "]结束", this.endSingleCode);
+        }
     }
 }
 
