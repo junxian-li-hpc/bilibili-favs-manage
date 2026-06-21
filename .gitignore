@@ -1,0 +1,28 @@
+# Claude Code local configuration and memory
+.claude/
+
+# Trellis workflow system
+.trellis/
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
