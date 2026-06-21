@@ -57,10 +57,15 @@ export class FloatingPanel {
    * 初始化并显示面板
    */
   init() {
-    this.loadFavorites();
+    // 先获取收藏夹数据（不触发 log）
+    this.favorites = this.manager.getAllFavoriteNames();
+
+    // 创建面板（此时 outputTextBox 被初始化）
     this.floatingPanel = this.createFloatingPanel();
     document.body.appendChild(this.floatingPanel);
     this.recordPanelSize();
+
+    // 现在可以安全地使用 log
     this.appendLog('浮动面板已创建', this.normalCode);
     this.showPageTypeIndicator();
   }

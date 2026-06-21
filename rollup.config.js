@@ -15,7 +15,7 @@ export default {
       return `// ==UserScript==
 // @name         Bilibili 收藏夹批量管理
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  批量复制 B 站收藏夹（适配新版 VUI + 跨页面流程）
 // @author       Your Name
 // @match        https://space.bilibili.com/*/favlist*

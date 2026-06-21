@@ -36,7 +36,11 @@ export class BilibiliAPI {
     }
 
     const items = parentElement.querySelectorAll(SELECTORS.FAVORITES_ITEM);
-    log('找到收藏夹数量:', items.length);
+    // 延迟日志：只有在 logger 已初始化时才输出
+    if (typeof log === 'function') {
+      // 使用 setTimeout 延迟到下一个事件循环，确保 panel 已初始化
+      setTimeout(() => log('找到收藏夹数量:', items.length), 0);
+    }
     return items;
   }
 
