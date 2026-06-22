@@ -239,43 +239,48 @@
         return [];
       }
 
-      const allNodes = Array.from(sidebar.childNodes);
+      // 获取所有收藏夹项
+      const allItems = Array.from(sidebar.querySelectorAll(SELECTORS.FAVORITES_ITEM));
       const favorites = [];
       let inCreatedSection = false;
 
-      for (const node of allNodes) {
-        // 检测"我创建的收藏夹"文本节点
-        if (node.nodeType === Node.TEXT_NODE &&
-            node.textContent.trim() === '我创建的收藏夹') {
+      // 遍历侧边栏的所有子元素（包括文本节点）
+      const allChildren = Array.from(sidebar.children);
+
+      for (const child of allChildren) {
+        const text = child.textContent.trim();
+
+        // 检测分组标题（可能是任何元素，通过文本内容判断）
+        if (text === '我创建的收藏夹') {
           inCreatedSection = true;
+          log('检测到"我创建的收藏夹"分组');
           continue;
         }
 
-        // 检测分隔标记（"我追的"或"其他收藏"）
-        if (node.nodeType === Node.TEXT_NODE) {
-          const text = node.textContent.trim();
-          if (text === '我追的合集/收藏夹' || text === '其他收藏') {
-            inCreatedSection = false;
-            continue;
-          }
+        if (text === '我追的合集/收藏夹' || text === '其他收藏') {
+          inCreatedSection = false;
+          log(`检测到分隔标记: ${text}，停止收集`);
+          continue;
         }
 
-        // 收集"我创建的收藏夹"分组中的 .vui_sidebar-item
-        if (inCreatedSection &&
-            node.nodeType === Node.ELEMENT_NODE &&
-            node.classList && node.classList.contains('vui_sidebar-item')) {
-          favorites.push(node);
+        // 如果是收藏夹项，且在"我创建的"分组中，则收集
+        if (inCreatedSection && child.classList.contains('vui_sidebar-item')) {
+          favorites.push(child);
         }
       }
 
-      // 计算过滤前的总数（用于日志）
-      const totalCount = sidebar.querySelectorAll(SELECTORS.FAVORITES_ITEM).length;
+      // 如果没有找到"我创建的收藏夹"标记，采用降级策略
+      if (!inCreatedSection && favorites.length === 0) {
+        warn('未找到"我创建的收藏夹"分组标记，使用降级策略');
+        warn('将返回所有收藏夹项（包含"我追的合集/收藏夹"）');
+        // 降级：返回所有收藏夹项
+        return allItems;
+      }
 
       // 延迟日志：只有在 logger 已初始化时才输出
       if (typeof log === 'function') {
-        // 使用 setTimeout 延迟到下一个事件循环，确保 panel 已初始化
         setTimeout(() => {
-          log('过滤结果: 总数', totalCount, '→ 我创建的', favorites.length);
+          log('过滤结果: 总数', allItems.length, '→ 我创建的', favorites.length);
         }, 0);
       }
 
@@ -1930,6 +1935,12 @@
      * 输出日志到面板
      */
     appendLog(info, type = this.normalCode) {
+      // 如果 outputTextBox 还未初始化，使用控制台输出
+      if (!this.outputTextBox) {
+        console.log(`[BiliBili Favs] ${info}`);
+        return;
+      }
+
       this.appendInfoToTextarea(this.outputTextBox, info, type);
     }
 
@@ -1937,6 +1948,12 @@
      * 将信息追加到文本区域
      */
     appendInfoToTextarea(textarea, info, type = this.normalCode) {
+      // 防御性检查
+      if (!textarea) {
+        console.log(`[BiliBili Favs] ${info}`);
+        return;
+      }
+
       let currentDate = new Date();
       let timezoneOffset = currentDate.getTimezoneOffset();
       let timezoneOffsetMilliseconds = timezoneOffset * 60 * 1000;
