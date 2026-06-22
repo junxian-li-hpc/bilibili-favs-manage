@@ -26,22 +26,65 @@ export class BilibiliAPI {
 
   /**
    * 获取所有收藏夹项
-   * @returns {NodeList} 收藏夹项列表
+   * @returns {Array<Element>} 收藏夹项列表
    */
   static getAllFavorites() {
-    const parentElement = document.querySelector(SELECTORS.FAVORITES_SIDEBAR);
-    if (!parentElement) {
-      error('找不到收藏夹侧边栏容器', SELECTORS.FAVORITES_SIDEBAR);
+    // 调用 getCreatedFavorites() 进行过滤
+    return this.getCreatedFavorites();
+  }
+
+  /**
+   * 获取"我创建的收藏夹"分组中的收藏夹项（过滤"我追的"和"其他收藏"）
+   * @returns {Array<Element>} 收藏夹项数组
+   */
+  static getCreatedFavorites() {
+    const sidebar = document.querySelector(SELECTORS.FAVORITES_SIDEBAR);
+    if (!sidebar) {
+      error('找不到收藏夹侧边栏容器');
       return [];
     }
 
-    const items = parentElement.querySelectorAll(SELECTORS.FAVORITES_ITEM);
+    const allNodes = Array.from(sidebar.childNodes);
+    const favorites = [];
+    let inCreatedSection = false;
+
+    for (const node of allNodes) {
+      // 检测"我创建的收藏夹"文本节点
+      if (node.nodeType === Node.TEXT_NODE &&
+          node.textContent.trim() === '我创建的收藏夹') {
+        inCreatedSection = true;
+        continue;
+      }
+
+      // 检测分隔标记（"我追的"或"其他收藏"）
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent.trim();
+        if (text === '我追的合集/收藏夹' || text === '其他收藏') {
+          inCreatedSection = false;
+          continue;
+        }
+      }
+
+      // 收集"我创建的收藏夹"分组中的 .vui_sidebar-item
+      if (inCreatedSection &&
+          node.nodeType === Node.ELEMENT_NODE &&
+          node.classList && node.classList.contains('vui_sidebar-item')) {
+        favorites.push(node);
+      }
+    }
+
+    // 计算过滤前的总数（用于日志）
+    const totalCount = sidebar.querySelectorAll(SELECTORS.FAVORITES_ITEM).length;
+
     // 延迟日志：只有在 logger 已初始化时才输出
     if (typeof log === 'function') {
       // 使用 setTimeout 延迟到下一个事件循环，确保 panel 已初始化
-      setTimeout(() => log('找到收藏夹数量:', items.length), 0);
+      setTimeout(() => {
+        log('过滤结果: 总数', totalCount, '→ 我创建的', favorites.length);
+      }, 0);
     }
-    return items;
+
+    return favorites;
   }
 
   /**
