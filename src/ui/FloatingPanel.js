@@ -374,6 +374,12 @@ export class FloatingPanel {
    * 输出日志到面板
    */
   appendLog(info, type = this.normalCode) {
+    // 如果 outputTextBox 还未初始化，使用控制台输出
+    if (!this.outputTextBox) {
+      console.log(`[BiliBili Favs] ${info}`);
+      return;
+    }
+
     this.appendInfoToTextarea(this.outputTextBox, info, type);
   }
 
@@ -381,6 +387,12 @@ export class FloatingPanel {
    * 将信息追加到文本区域
    */
   appendInfoToTextarea(textarea, info, type = this.normalCode) {
+    // 防御性检查
+    if (!textarea) {
+      console.log(`[BiliBili Favs] ${info}`);
+      return;
+    }
+
     let currentDate = new Date();
     let timezoneOffset = currentDate.getTimezoneOffset();
     let timezoneOffsetMilliseconds = timezoneOffset * 60 * 1000;
