@@ -41,8 +41,8 @@ export class FloatingPanel {
     this.leftPanel = null;
     this.rightPanel = null;
     this.outputTextBox = null;
-    this.sourceSelect = null;
-    this.targetSelect = null;
+    // 已移除 sourceSelect 和 targetSelect（改用复选框列表）
+    this.favCheckboxItemList = [];  // 新增：复选框项列表
 
     // 按钮
     this.selectAllButton = null;
@@ -108,9 +108,9 @@ export class FloatingPanel {
     const btnPanel = this.createButtonPanel();
     leftPanel.appendChild(btnPanel);
 
-    // 创建选择器面板
-    const selectorPanel = this.createSelectorPanel();
-    leftPanel.appendChild(selectorPanel);
+    // 创建收藏夹面板（复选框列表）
+    const favPanel = this.createFavPanel();
+    leftPanel.appendChild(favPanel);
 
     return leftPanel;
   }
@@ -153,6 +153,11 @@ export class FloatingPanel {
     btnPanel.style.backgroundColor = '#e8e8e8';
     btnPanel.style.flexDirection = 'column';
 
+    // 全选按钮
+    this.selectAllButton = UIComponents.createButton('点我全选', () => {
+      this.toggleSelectAll();
+    });
+
     const startBatchTransferButton = UIComponents.createButton('开始批量复制', () => {
       this.startBatchTransfer();
     });
@@ -165,6 +170,7 @@ export class FloatingPanel {
       this.floatingPanel.remove();
     });
 
+    btnPanel.appendChild(this.selectAllButton);
     btnPanel.appendChild(startBatchTransferButton);
     btnPanel.appendChild(this.minimizeButton);
     btnPanel.appendChild(destroyButton);
@@ -175,63 +181,92 @@ export class FloatingPanel {
   }
 
   /**
-   * 创建选择器面板
+   * 切换全选状态
    */
-  createSelectorPanel() {
-    const selectorPanel = document.createElement('div');
-    selectorPanel.style.display = 'flex';
-    selectorPanel.style.flexDirection = 'column';
-    selectorPanel.style.padding = '10px';
-    selectorPanel.style.border = '1px solid #ccc';
-    selectorPanel.style.backgroundColor = '#fff';
-    selectorPanel.style.flexGrow = '1';
-    selectorPanel.style.overflow = 'auto';
+  toggleSelectAll() {
+    if (this.selectAllButton.textContent === '点我全选') {
+      for (const item of this.favCheckboxItemList) {
+        item.checkbox.checked = true;
+      }
+      this.selectAllButton.textContent = '点我全部取消';
+    } else {
+      for (const item of this.favCheckboxItemList) {
+        item.checkbox.checked = false;
+      }
+      this.selectAllButton.textContent = '点我全选';
+    }
+  }
 
-    // 源收藏夹标题
-    const sourceTitle = document.createElement('h4');
-    sourceTitle.textContent = '源收藏夹:';
-    sourceTitle.style.margin = '5px 0';
-    selectorPanel.appendChild(sourceTitle);
+  /**
+   * 创建收藏夹面板（复选框列表）
+   */
+  createFavPanel() {
+    const favPanel = document.createElement('div');
+    favPanel.className = 'fav-panel';
+    favPanel.style.display = 'flex';
+    favPanel.style.flexDirection = 'column';
+    favPanel.style.padding = '10px';
+    favPanel.style.border = '1px solid #ccc';
+    favPanel.style.backgroundColor = '#fff';
+    favPanel.style.flexGrow = '1';
+    favPanel.style.overflow = 'auto';
 
-    // 源收藏夹下拉框
-    this.sourceSelect = UIComponents.createSelect(this.favorites);
-    this.sourceSelect.style.marginBottom = '15px';
-    selectorPanel.appendChild(this.sourceSelect);
+    // 标题行
+    const titleRow = document.createElement('div');
+    titleRow.style.display = 'flex';
+    titleRow.style.justifyContent = 'space-between';
+    titleRow.style.marginBottom = '10px';
 
-    // 目标收藏夹标题
-    const targetTitle = document.createElement('h4');
-    targetTitle.textContent = '目标收藏夹:';
-    targetTitle.style.margin = '5px 0';
-    selectorPanel.appendChild(targetTitle);
+    const srcTitle = document.createElement('h4');
+    srcTitle.textContent = '源收藏夹';
+    srcTitle.style.margin = '0';
+    srcTitle.style.fontWeight = 'bold';
 
-    // 目标收藏夹输入框
-    const targetInput = document.createElement('input');
-    targetInput.type = 'text';
-    targetInput.placeholder = '输入新收藏夹名称';
-    targetInput.style.width = '100%';
-    targetInput.style.padding = '5px';
-    targetInput.style.fontSize = '14px';
-    targetInput.style.border = '1px solid #ccc';
-    targetInput.style.borderRadius = '3px';
-    targetInput.style.boxSizing = 'border-box';
-    selectorPanel.appendChild(targetInput);
+    const dstTitle = document.createElement('h4');
+    dstTitle.textContent = '目标收藏夹';
+    dstTitle.style.margin = '0';
+    dstTitle.style.fontWeight = 'bold';
 
-    this.targetInput = targetInput;
+    titleRow.appendChild(srcTitle);
+    titleRow.appendChild(dstTitle);
+    favPanel.appendChild(titleRow);
 
-    // 目标收藏夹下拉框
-    this.targetSelect = UIComponents.createSelect(this.favorites);
-    this.targetSelect.style.marginTop = '10px';
-    selectorPanel.appendChild(this.targetSelect);
+    // 创建复选框项列表
+    this.favCheckboxItemList = this.createFavCheckboxItems();
+    for (const item of this.favCheckboxItemList) {
+      favPanel.appendChild(item.checkboxContainer);
+    }
 
-    // 添加提示文本
-    const hintText = document.createElement('p');
-    hintText.style.fontSize = '12px';
-    hintText.style.color = '#666';
-    hintText.style.marginTop = '10px';
-    hintText.textContent = '提示: 可选择已有收藏夹或输入新名称';
-    selectorPanel.appendChild(hintText);
+    return favPanel;
+  }
 
-    return selectorPanel;
+  /**
+   * 创建复选框项列表
+   */
+  createFavCheckboxItems() {
+    const items = [];
+    for (const favName of this.favorites) {
+      const checkboxItem = new CheckboxItem(favName);
+      items.push(checkboxItem);
+    }
+    return items;
+  }
+
+  /**
+   * 获取选中的复制任务列表
+   * @returns {Array<{source: string, target: string}>}
+   */
+  getSelectedTasks() {
+    const tasks = [];
+    for (const item of this.favCheckboxItemList) {
+      if (item.getCheckboxValue()) {
+        tasks.push({
+          source: item.getLabelValue(),
+          target: item.getInputTextValue()
+        });
+      }
+    }
+    return tasks;
   }
 
   /**
@@ -305,47 +340,32 @@ export class FloatingPanel {
    * 开始批量复制
    */
   async startBatchTransfer() {
-    const source = this.sourceSelect.value;
-    const targetFromInput = this.targetInput.value.trim();
-    const targetFromSelect = this.targetSelect.value;
+    // 获取选中的复制任务
+    const tasks = this.getSelectedTasks();
 
-    // 优先使用输入框的值
-    const target = targetFromInput || targetFromSelect;
-
-    if (!source) {
-      this.appendLog('错误: 请选择源收藏夹', this.errorCode);
+    if (tasks.length === 0) {
+      this.appendLog('错误: 请至少勾选一个源收藏夹', this.errorCode);
       return;
     }
 
-    if (!target) {
-      this.appendLog('错误: 请选择或输入目标收藏夹', this.errorCode);
-      return;
-    }
-
-    if (source === target) {
-      this.appendLog('错误: 源收藏夹和目标收藏夹不能相同', this.errorCode);
-      return;
-    }
-
-    this.appendLog(`开始复制: ${source} → ${target}`, this.startBatchCode);
+    this.appendLog(`开始批量复制，共 ${tasks.length} 个任务`, this.startBatchCode);
 
     // 禁用按钮
     this.startBatchTransferButton.disabled = true;
+    this.selectAllButton.disabled = true;
     this.startBatchTransferButton.textContent = '复制中...';
 
     try {
-      const success = await this.manager.copyFavorite(source, target);
-      if (success) {
-        this.appendLog('✓ 复制完成!', this.endBatchCode);
-      } else {
-        this.appendLog('✗ 复制失败', this.errorCode);
-      }
+      // 调用 FavoriteManager 的批量复制方法
+      await this.manager.batchCopy(tasks);
+      this.appendLog('✓ 批量复制完成!', this.endBatchCode);
     } catch (err) {
-      this.appendLog(`✗ 复制出错: ${err.message}`, this.errorCode);
+      this.appendLog(`✗ 批量复制出错: ${err.message}`, this.errorCode);
       console.error(err);
     } finally {
       // 恢复按钮
       this.startBatchTransferButton.disabled = false;
+      this.selectAllButton.disabled = false;
       this.startBatchTransferButton.textContent = '开始批量复制';
     }
   }
