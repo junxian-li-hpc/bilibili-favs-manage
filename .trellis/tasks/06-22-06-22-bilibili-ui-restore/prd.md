@@ -452,6 +452,8 @@ function getCreatedFavorites() {
 4. **油猴脚本规范**：最终产物符合 UserScript 格式
 5. **状态持久化**：使用 `GM_setValue` / `GM_getValue` API
 6. **避免反爬虫**：操作间添加合理延迟
+7. **禁止直接调用 B 站 API**：只允许纯 DOM 模拟点击，避免封号风险并保持与设计一致（详见 design.md §0）
+8. **跨页面流程为必需**：他人页面的复制对话框能选"我自己"的收藏夹作目标，但无法在其中新建夹，因此缺失的目标夹必须先跳到自己页面创建再跳回（详见 design.md §0.1-0.2）
 
 ## Acceptance Criteria Summary
 

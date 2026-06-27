@@ -1372,3 +1372,86 @@ npm run build
 ---
 
 **End of Implementation Plan**
+
+---
+
+## Phase 5: 跨页面流程修复（DOM 方案收尾 · 2026-06-27）
+
+> **背景**：上一个 AI 曾把跨页面改成直调 B 站 API，已回退（`git stash@{0}`）。本阶段在 DOM 点击式方案上修复 3 个导致跨页面跑不通的 bug。
+> **约束**：见 `design.md §0`——纯 DOM 模拟点击，**禁止直调 B 站 API**；不要动 stash 里的内容。
+> **策略**：用户选定「总是先去自己页面 compare + 创建缺失夹，再跳回复制」（option A）。
+> **注**：本阶段与前文 2.2 / 3.3 / 4.2 伪代码冲突处，**以本阶段为准**。
+
+### 修复 1：缺失对比移到「自己页面」（creating 阶段）
+- 文件：`src/core/CrossPageFlowManager.js`、`src/core/FavoriteManager.js`
+- 现状 bug：`startCrossPageFlow()` 在**他人页面**用 `getAllFavoriteNames()`（=对方的夹）算缺失，结果错误，会去创建你其实已有的夹。
+- 改为：
+  - **`startCrossPageFlow(tasks)`（他人页面 / idle）**：不算缺失。仅 `StateManager.saveState({ phase:'creating', returnURL: location.href, tasks })`，然后跳转到自己页面（option A：只要在他人页面就跳）。
+  - **`resumeFlow()` 的 `creating` 分支（自己页面）**：用当前页 `manager.getAllFavoriteNames()`（此时=自己的夹）计算 `missing = 去重(tasks.map(t=>t.target)).filter(name => !ownNames.includes(name))`；只对 `missing` 调 `batchCreateFavorites`；`missing` 为空则跳过创建。完成后 `saveState({ ...state, phase:'copying' })` → 跳回 `state.returnURL`。
+
+### 修复 2：copying 阶段纯复制，不再重复触发跨页面
+- 文件：`src/core/FavoriteManager.js`、`src/core/CrossPageFlowManager.js`
+- `batchCopy(copyList, options = {})`：当 `options.skipCrossPage === true` 时**跳过**开头"他人页面是否需创建"的分支，直接进入复制循环。
+- `resumeFlow()` 的 `copying` 分支：`await this.manager.batchCopy(state.tasks, { skipCrossPage: true })`，复制完成后 `StateManager.clearState()`。
+
+### 修复 3：跨页面执行期间日志可见
+- 文件：`src/main.js`
+- 现状：`resumeFlow()`（line 42）在 `setLoggerPanel()`（line 61）之前，creating/copying 自动阶段日志只进 console，面板看不到。
+- 改为：在 `resumeFlow()` 之前，若检测到存在待恢复状态（`StateManager.loadState()` 非空），先创建 `FloatingPanel` 并 `setLoggerPanel(panel)`，使自动阶段日志输出到面板。注意避免与正常初始化路径重复创建面板。
+
+### 验证
+- `npm run build` 通过，`dist/BilibiliFavsManage.user.js` 无错生成。
+- 自测：他人页面勾选源 + 填新目标名 → 跳自己页面**只创建真缺的夹** → 跳回 → 完成复制；目标夹已存在时不重复创建、不死循环、复制实际执行。
+
+---
+
+## Phase 5.1: 真机测试修复（2026-06-27 第 1 轮）
+
+真机测试（自己页面收到 `creating` 状态）暴露两个问题，已修复：
+
+### Bug A：自己页面创建收藏夹时"对话框未出现"
+- 现象：`createSingleFavorite` 进批量模式后直接点"复制至"，但**未先全选视频**，"复制至"按钮 inert → `waitForDialog` 超时 → 创建失败。
+- 修复（`src/core/CrossPageFlowManager.js` `createSingleFavorite`）：进批量模式改用 `ensureBatchModeActive()`，并在点"复制至"**之前**加 `clickSelectAll()`（对齐已验证的 `copyOnePage` 流程：全选 → 复制至 → 等对话框）。
+
+### Bug B：`getCreatedFavorites()` 过滤退化（"未找到分组标记"）
+- 现象：真机日志反复出现"未找到'我创建的收藏夹'分组标记，使用降级策略"，返回全部（含"我追的"）。
+- 根因：旧实现只遍历 `sidebar.children`（直接子节点）找精确文本，但分组标题嵌套在 wrapper 内、并非直接子节点。
+- 修复（`src/core/BilibiliAPI.js` `getCreatedFavorites`）：改为遍历**全部后代**按精确文本定位标题元素（取不含收藏夹项的最深匹配），再用 `compareDocumentPosition` 按文档顺序切出"我创建的收藏夹"与下一分隔标记（"我追的合集/收藏夹" / "其他收藏"）之间的项；找不到标题时仍降级返回全部。
+- 依据：归档快照 `…/06-22-bilibili-favs-adapt/research/bilibili-favs-snapshot.txt`（确认标题与项的文档顺序）。
+
+### 验证
+- `npm run build` 通过，dist 已含修复（`clickSelectAll` / `ensureBatchModeActive` / `compareDocumentPosition`）。
+- 待真机回归：creating 阶段能真正建夹；面板/`getAllFavoriteNames` 只含"我创建的收藏夹"。
+
+---
+
+## Phase 5.2: 建夹流程优化（2026-06-27 第 2 轮）
+
+真机回归通过（Phase 5.1 两修复均验证 OK：`过滤结果: 总数 74 → 我创建的 21`、creating 成功建夹、copying 成功复制）。
+
+用户反馈：建夹不必走"批量模式 → 复制对话框 → 新建"那套绕流程，**左侧边栏本就有"新建收藏夹"按钮**，直接点更简洁稳健（不依赖某个夹里有视频）。
+
+### 优化
+- 新增 `BilibiliAPI.createFavoriteViaSidebar(favName)`：在 `.favlist-aside` 内按精确文本"新建收藏夹"定位叶子元素 → 点击其可点击祖先 → 等待名称输入框（复用 `CREATE_FAV_NAME_INPUT` / `inputFavoriteName` / `clickCreateButton`）→ 创建。入口或输入框缺失返回 false。
+- `CrossPageFlowManager.createSingleFavorite` 改为**优先**走 `createFavoriteViaSidebar`；失败时**回退**到 `createViaCopyDialog`（即 5.1 已验证的批量模式对话框方式，整段保留为回退分支，绝不丢失已工作能力）。
+- 选择器无需新增（复用 `BUTTON_TEXTS.CREATE_NEW = '新建收藏夹'`）。
+
+### 验证
+- `npm run build` 通过，dist 含 `createFavoriteViaSidebar` / `createViaCopyDialog`。
+- 待真机回归：creating 阶段日志应出现 `点击左侧边栏[新建收藏夹]` 而非"批量模式/复制至"；若侧边栏方式失效会自动回退，仍能建夹。
+
+### 回归结果（log2.md, 13:44）
+- ✅ 侧边栏建夹生效：日志 `点击左侧边栏[新建收藏夹]` → `✓ 创建收藏夹 [卦] 成功（侧边栏入口）`，绕路流程已消除。
+
+---
+
+## 已知问题 / 后续（2026-06-27 deferred）
+
+### Issue C：跨页面跳回他人页面后偶发"面板 / 收藏夹列表不显示、日志报错"
+- 现象（log2.md）：creating 完成跳回他人页面后，面板未显示；强制刷新后他人收藏夹列表未加载、日志报错；**复跑流程后恢复正常**（copying 成功）。
+- 疑因：页面加载时序——脚本在他人页面 VUI 列表异步渲染完成前就执行了 `resumeFlow` / `getAllFavorites`。`waitForPageLoad` 仅等 `load` 事件，VUI 渲染可能更晚。
+- 后续方向（用户认可，**本次暂缓**）：
+  1. 跨页面恢复前，轮询等待收藏夹元素（`.vui_sidebar-item` 或目标源夹）真正出现再执行；
+  2. 面板增加"重新检测 / 刷新收藏夹"按钮，支持手动重试；
+  3. copying 阶段失败时自动重试一次。
+- 状态：**本版先提交，不在本次范围内修复。**
