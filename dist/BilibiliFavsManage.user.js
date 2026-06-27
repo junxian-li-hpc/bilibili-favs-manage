@@ -55,6 +55,7 @@
   const BUTTON_TEXTS = {
     BATCH_OPERATION: '批量操作',
     COPY_TO: '复制至',
+    CREATE_NEW: '新建收藏夹',
     CREATE: '创建',
     SUCCESS: '操作成功'
   };
@@ -239,52 +240,50 @@
         return [];
       }
 
-      // 获取所有收藏夹项
       const allItems = Array.from(sidebar.querySelectorAll(SELECTORS.FAVORITES_ITEM));
-      const favorites = [];
-      let inCreatedSection = false;
-
-      // 遍历侧边栏的所有子元素（包括文本节点）
-      const allChildren = Array.from(sidebar.children);
-
-      for (const child of allChildren) {
-        const text = child.textContent.trim();
-
-        // 检测分组标题（可能是任何元素，通过文本内容判断）
-        if (text === '我创建的收藏夹') {
-          inCreatedSection = true;
-          log('检测到"我创建的收藏夹"分组');
-          continue;
-        }
-
-        if (text === '我追的合集/收藏夹' || text === '其他收藏') {
-          inCreatedSection = false;
-          log(`检测到分隔标记: ${text}，停止收集`);
-          continue;
-        }
-
-        // 如果是收藏夹项，且在"我创建的"分组中，则收集
-        if (inCreatedSection && child.classList.contains('vui_sidebar-item')) {
-          favorites.push(child);
-        }
+      if (allItems.length === 0) {
+        return [];
       }
 
-      // 如果没有找到"我创建的收藏夹"标记，采用降级策略
-      if (!inCreatedSection && favorites.length === 0) {
+      // 在侧边栏内按"精确文本"定位分组标题元素。
+      // 标题不一定是 sidebar 的直接子节点（常嵌套在 wrapper 内），
+      // 因此遍历全部后代，取文本精确匹配且不含收藏夹项的最深元素。
+      const findMarker = (markerText) => {
+        const matches = Array.from(sidebar.querySelectorAll('*')).filter(
+          el => el.textContent.trim() === markerText &&
+                !el.querySelector(SELECTORS.FAVORITES_ITEM)
+        );
+        return matches.length ? matches[matches.length - 1] : null;
+      };
+
+      // b 是否在 a 之后（文档顺序）
+      const follows = (a, b) =>
+        !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+      const createdMarker = findMarker('我创建的收藏夹');
+      if (!createdMarker) {
         warn('未找到"我创建的收藏夹"分组标记，使用降级策略');
         warn('将返回所有收藏夹项（包含"我追的合集/收藏夹"）');
-        // 降级：返回所有收藏夹项
         return allItems;
       }
 
-      // 延迟日志：只有在 logger 已初始化时才输出
-      if (typeof log === 'function') {
-        setTimeout(() => {
-          log('过滤结果: 总数', allItems.length, '→ 我创建的', favorites.length);
-        }, 0);
-      }
+      // 结束标记：'我追的合集/收藏夹' 或 '其他收藏' 中，位于 createdMarker 之后且最靠前的一个
+      const endMarker = ['我追的合集/收藏夹', '其他收藏']
+        .map(findMarker)
+        .filter(m => m && follows(createdMarker, m))
+        .sort((a, b) => (follows(a, b) ? -1 : 1))[0] || null;
 
-      return favorites;
+      // 收集位于 createdMarker 与 endMarker 之间的收藏夹项
+      const favorites = allItems.filter(item => {
+        if (!follows(createdMarker, item)) return false;
+        if (endMarker && !follows(item, endMarker)) return false;
+        return true;
+      });
+
+      log('过滤结果: 总数', allItems.length, '→ 我创建的', favorites.length);
+
+      // 兜底：若意外为空，返回全部，避免面板空白
+      return favorites.length > 0 ? favorites : allItems;
     }
 
     /**
@@ -482,6 +481,48 @@
 
       log('点击创建按钮');
       createConfirmBtn.click();
+      await delay(CONFIG.DELAY.MIDDLE);
+      return true;
+    }
+
+    /**
+     * 通过左侧边栏原生"新建收藏夹"入口创建收藏夹
+     * （无需进入批量模式/复制对话框；入口或对话框缺失时返回 false，交由调用方回退）
+     * @param {string} favName - 收藏夹名称
+     * @returns {Promise<boolean>}
+     */
+    static async createFavoriteViaSidebar(favName) {
+      const sidebar = document.querySelector(SELECTORS.FAVORITES_SIDEBAR);
+      if (!sidebar) return false;
+
+      // 文本精确为"新建收藏夹"的叶子元素即入口
+      const entry = Array.from(sidebar.querySelectorAll('*')).find(
+        el => el.children.length === 0 &&
+              el.textContent.trim() === BUTTON_TEXTS.CREATE_NEW
+      );
+      if (!entry) {
+        warn('侧边栏未找到"新建收藏夹"入口');
+        return false;
+      }
+
+      log('点击左侧边栏[新建收藏夹]');
+      const clickable = entry.closest(
+        'button, [role="button"], [class*="add"], [class*="create"], [class*="btn"]'
+      ) || entry;
+      clickable.click();
+      await delay(CONFIG.DELAY.SHORT);
+
+      // 等待名称输入框（复用与复制对话框一致的创建组件）
+      const input = await waitForElement(SELECTORS.CREATE_FAV_NAME_INPUT, 3000);
+      if (!input) {
+        warn('点击"新建收藏夹"后未出现名称输入框');
+        return false;
+      }
+
+      // 输入名称并点击创建
+      if (!await this.inputFavoriteName(favName)) return false;
+      if (!await this.clickCreateButton()) return false;
+
       await delay(CONFIG.DELAY.MIDDLE);
       return true;
     }
@@ -757,32 +798,14 @@
 
     /**
      * 开始跨页面流程：保存状态并跳转到自己页面
+     *
+     * 注意：此时处于「他人页面」，无法在此判断「自己」缺哪些收藏夹
+     * （`getAllFavoriteNames()` 此处取到的是对方的收藏夹）。因此本方法
+     * 不做缺失对比，缺失对比延后到 `resumeFlow()` 的 creating 阶段（自己页面）。
      * @param {Array<{source: string, target: string}>} tasks - 复制任务列表
      * @returns {Promise<void>}
      */
     async startCrossPageFlow(tasks) {
-      // 获取需要创建的收藏夹列表
-      const currentFavs = this.manager.getAllFavoriteNames();
-      const missingFavs = tasks
-        .map(t => t.target)
-        .filter((name, index, self) => self.indexOf(name) === index) // 去重
-        .filter(name => !currentFavs.includes(name)); // 过滤已存在的
-
-      if (missingFavs.length === 0) {
-        log('所有目标收藏夹均已存在，无需跨页面创建');
-        return;
-      }
-
-      log(`检测到 ${missingFavs.length} 个收藏夹需要创建:`, missingFavs.join(', '));
-
-      // 保存状态
-      StateManager.saveState({
-        phase: 'creating',
-        returnURL: window.location.href,
-        tasks: tasks,
-        missingFavs: missingFavs
-      });
-
       // 跳转到自己的收藏夹页面
       const ownURL = PageDetector.getOwnFavListURL();
       if (!ownURL) {
@@ -790,8 +813,15 @@
         return;
       }
 
+      // 保存状态（缺失对比延后到自己页面执行）
+      StateManager.saveState({
+        phase: 'creating',
+        returnURL: window.location.href,
+        tasks: tasks
+      });
+
       log('========================================');
-      log('即将跳转到自己的收藏夹页面批量创建收藏夹');
+      log('即将跳转到自己的收藏夹页面对比并创建缺失收藏夹');
       log('完成后将自动返回并继续复制');
       log('跳转倒计时: 3 秒...');
       log('========================================');
@@ -832,11 +862,28 @@
     }
 
     /**
-     * 创建单个收藏夹（通过批量模式对话框）
+     * 创建单个收藏夹：优先左侧边栏原生入口，失败回退到复制对话框方式
      * @param {string} favName - 收藏夹名称
      * @returns {Promise<boolean>}
      */
     async createSingleFavorite(favName) {
+      // 优先：左侧边栏原生"新建收藏夹"入口（最简，无需批量模式/复制对话框）
+      if (await BilibiliAPI.createFavoriteViaSidebar(favName)) {
+        log(`✓ 创建收藏夹 [${favName}] 成功（侧边栏入口）`);
+        return true;
+      }
+
+      // 回退：复制对话框内"新建收藏夹"（已验证可用）
+      log('侧边栏入口不可用，回退到复制对话框方式创建');
+      return await this.createViaCopyDialog(favName);
+    }
+
+    /**
+     * 通过批量模式复制对话框创建收藏夹（回退方案，已验证可用）
+     * @param {string} favName - 收藏夹名称
+     * @returns {Promise<boolean>}
+     */
+    async createViaCopyDialog(favName) {
       // 1. 点击第一个收藏夹（确保有内容可操作）
       const allFavs = BilibiliAPI.getAllFavorites();
       if (allFavs.length === 0) {
@@ -848,13 +895,20 @@
       await delay(CONFIG.DELAY.MIDDLE);
 
       // 2. 进入批量操作模式
-      const batchSuccess = await BilibiliAPI.clickBatchOperationButton();
+      const batchSuccess = await BilibiliAPI.ensureBatchModeActive();
       if (!batchSuccess) {
         error('无法进入批量模式');
         return false;
       }
 
-      // 3. 点击复制按钮打开对话框
+      // 3. 全选当前页视频（否则"复制至"按钮不可用，对话框不会弹出）
+      if (!BilibiliAPI.clickSelectAll()) {
+        error('无法全选视频，"复制至"将不可用');
+        return false;
+      }
+      await delay(CONFIG.DELAY.SHORT);
+
+      // 4. 点击复制按钮打开对话框
       if (!await BilibiliAPI.clickCopyButton()) {
         return false;
       }
@@ -902,27 +956,39 @@
       log('========================================');
 
       if (state.phase === 'creating') {
-        // 在自己页面，执行批量创建
-        const success = await this.batchCreateFavorites(state.missingFavs);
+        // 当前已在「自己页面」，此时 getAllFavoriteNames() = 自己的收藏夹
+        // 在此对比目标名称，找出真正缺失（自己还没有）的收藏夹
+        const ownNames = this.manager.getAllFavoriteNames();
+        const missing = state.tasks
+          .map(t => t.target)
+          .filter((name, index, self) => self.indexOf(name) === index) // 去重
+          .filter(name => !ownNames.includes(name)); // 过滤自己已有的
 
-        if (success) {
-          // 更新状态：准备返回复制
-          StateManager.saveState({
-            ...state,
-            phase: 'copying'
-          });
-
-          log('========================================');
-          log('收藏夹创建完成，返回原页面继续复制');
-          log('跳转倒计时: 3 秒...');
-          log('========================================');
-
-          await delay(3000);
-          window.location.href = state.returnURL;
+        if (missing.length > 0) {
+          log(`检测到 ${missing.length} 个收藏夹需要创建:`, missing.join(', '));
+          const success = await this.batchCreateFavorites(missing);
+          if (!success) {
+            error('收藏夹创建失败，请手动创建后重试');
+            StateManager.clearState();
+            return true;
+          }
         } else {
-          error('收藏夹创建失败，请手动创建后重试');
-          StateManager.clearState();
+          log('所有目标收藏夹均已存在，无需创建');
         }
+
+        // 更新状态：准备返回复制
+        StateManager.saveState({
+          ...state,
+          phase: 'copying'
+        });
+
+        log('========================================');
+        log('收藏夹准备完成，返回原页面继续复制');
+        log('跳转倒计时: 3 秒...');
+        log('========================================');
+
+        await delay(3000);
+        window.location.href = state.returnURL;
 
         return true;
       } else if (state.phase === 'copying') {
@@ -931,11 +997,11 @@
         log('已返回原页面，继续复制流程');
         log('========================================');
 
-        // 清除状态
-        StateManager.clearState();
+        // 执行复制（跳过跨页面检测，避免重复触发跳转）
+        await this.manager.batchCopy(state.tasks, { skipCrossPage: true });
 
-        // 自动触发复制流程
-        await this.manager.batchCopy(state.tasks);
+        // 复制完成后清除状态
+        StateManager.clearState();
 
         return true;
       }
@@ -1139,21 +1205,21 @@
     /**
      * 批量复制收藏夹
      * @param {Array<{source: string, target: string}>} copyList - 复制列表
+     * @param {Object} [options] - 选项
+     * @param {boolean} [options.skipCrossPage=false] - 跳过跨页面检测，直接进入复制循环
      * @returns {Promise<void>}
      */
-    async batchCopy(copyList) {
+    async batchCopy(copyList, options = {}) {
+      const { skipCrossPage = false } = options;
       log('开始批量复制，共', copyList.length, '个任务');
 
-      // 检测是否需要跨页面创建收藏夹
-      const isOwnPage = PageDetector.isOwnPage();
-      if (!isOwnPage) {
-        // 在别人页面，检查是否有需要创建的收藏夹
-        const currentFavs = this.getAllFavoriteNames();
-        const needCreate = copyList.some(task => !currentFavs.includes(task.target));
-
-        if (needCreate) {
-          log('检测到在别人页面且需要创建新收藏夹');
-          log('启动跨页面流程...');
+      // 检测是否需要跨页面创建收藏夹（copying 阶段恢复时跳过，避免重复触发跳转）
+      if (!skipCrossPage) {
+        const isOwnPage = PageDetector.isOwnPage();
+        if (!isOwnPage) {
+          // 在别人页面：option A——只要在他人页面就走跨页面流程，
+          // 由「自己页面」阶段再对比并创建缺失的收藏夹
+          log('检测到在别人页面，启动跨页面流程...');
           await this.crossPageFlow.startCrossPageFlow(copyList);
           return; // 跳转后中断当前流程
         }
@@ -2055,10 +2121,21 @@
     const isOwnPage = PageDetector.isOwnPage();
     log('页面类型:', isOwnPage ? '我的收藏夹' : '他人的收藏夹');
 
+    // 若存在待恢复的跨页面状态，先创建面板并绑定日志，
+    // 使 creating/copying 自动阶段的日志能输出到面板（而非只进 console）
+    let panel = null;
+    if (StateManager.loadState()) {
+      panel = new FloatingPanel(manager);
+      setLoggerPanel(panel);
+      panel.init();
+      window.BiliFavManager = manager;
+      window.BiliFavPanel = panel;
+    }
+
     // 检查是否需要恢复跨页面流程
     const handledCrossPage = await manager.crossPageFlow.resumeFlow();
     if (handledCrossPage) {
-      // 跨页面流程已处理，不再显示面板
+      // 跨页面流程已处理，面板（若已创建）保留以显示日志
       log('跨页面流程执行完毕');
       return;
     }
@@ -2071,17 +2148,19 @@
       log('收藏夹列表:', favorites.slice(0, 5).join(', '), favorites.length > 5 ? '...' : '');
     }
 
-    // 初始化浮动面板 UI
-    const panel = new FloatingPanel(manager);
+    // 初始化浮动面板 UI（若上面尚未创建）
+    if (!panel) {
+      panel = new FloatingPanel(manager);
 
-    // 设置日志面板，让 panel.init() 中的日志也能输出到面板
-    setLoggerPanel(panel);
+      // 设置日志面板，让 panel.init() 中的日志也能输出到面板
+      setLoggerPanel(panel);
 
-    panel.init();
+      panel.init();
 
-    // 将管理器和面板实例挂载到全局，方便控制台调用
-    window.BiliFavManager = manager;
-    window.BiliFavPanel = panel;
+      // 将管理器和面板实例挂载到全局，方便控制台调用
+      window.BiliFavManager = manager;
+      window.BiliFavPanel = panel;
+    }
 
     log('脚本已就绪！浮动面板已显示');
     log('控制台使用方法:');

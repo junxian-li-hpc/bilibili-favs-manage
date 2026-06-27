@@ -5,6 +5,7 @@
 
 import { FavoriteManager } from './core/FavoriteManager.js';
 import { PageDetector } from './core/PageDetector.js';
+import { StateManager } from './core/StateManager.js';
 import { FloatingPanel } from './ui/FloatingPanel.js';
 import { log, setLoggerPanel } from './utils/logger.js';
 
@@ -38,10 +39,21 @@ async function main() {
   const isOwnPage = PageDetector.isOwnPage();
   log('页面类型:', isOwnPage ? '我的收藏夹' : '他人的收藏夹');
 
+  // 若存在待恢复的跨页面状态，先创建面板并绑定日志，
+  // 使 creating/copying 自动阶段的日志能输出到面板（而非只进 console）
+  let panel = null;
+  if (StateManager.loadState()) {
+    panel = new FloatingPanel(manager);
+    setLoggerPanel(panel);
+    panel.init();
+    window.BiliFavManager = manager;
+    window.BiliFavPanel = panel;
+  }
+
   // 检查是否需要恢复跨页面流程
   const handledCrossPage = await manager.crossPageFlow.resumeFlow();
   if (handledCrossPage) {
-    // 跨页面流程已处理，不再显示面板
+    // 跨页面流程已处理，面板（若已创建）保留以显示日志
     log('跨页面流程执行完毕');
     return;
   }
@@ -54,17 +66,19 @@ async function main() {
     log('收藏夹列表:', favorites.slice(0, 5).join(', '), favorites.length > 5 ? '...' : '');
   }
 
-  // 初始化浮动面板 UI
-  const panel = new FloatingPanel(manager);
+  // 初始化浮动面板 UI（若上面尚未创建）
+  if (!panel) {
+    panel = new FloatingPanel(manager);
 
-  // 设置日志面板，让 panel.init() 中的日志也能输出到面板
-  setLoggerPanel(panel);
+    // 设置日志面板，让 panel.init() 中的日志也能输出到面板
+    setLoggerPanel(panel);
 
-  panel.init();
+    panel.init();
 
-  // 将管理器和面板实例挂载到全局，方便控制台调用
-  window.BiliFavManager = manager;
-  window.BiliFavPanel = panel;
+    // 将管理器和面板实例挂载到全局，方便控制台调用
+    window.BiliFavManager = manager;
+    window.BiliFavPanel = panel;
+  }
 
   log('脚本已就绪！浮动面板已显示');
   log('控制台使用方法:');

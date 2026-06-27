@@ -17,32 +17,14 @@ export class CrossPageFlowManager {
 
   /**
    * 开始跨页面流程：保存状态并跳转到自己页面
+   *
+   * 注意：此时处于「他人页面」，无法在此判断「自己」缺哪些收藏夹
+   * （`getAllFavoriteNames()` 此处取到的是对方的收藏夹）。因此本方法
+   * 不做缺失对比，缺失对比延后到 `resumeFlow()` 的 creating 阶段（自己页面）。
    * @param {Array<{source: string, target: string}>} tasks - 复制任务列表
    * @returns {Promise<void>}
    */
   async startCrossPageFlow(tasks) {
-    // 获取需要创建的收藏夹列表
-    const currentFavs = this.manager.getAllFavoriteNames();
-    const missingFavs = tasks
-      .map(t => t.target)
-      .filter((name, index, self) => self.indexOf(name) === index) // 去重
-      .filter(name => !currentFavs.includes(name)); // 过滤已存在的
-
-    if (missingFavs.length === 0) {
-      log('所有目标收藏夹均已存在，无需跨页面创建');
-      return;
-    }
-
-    log(`检测到 ${missingFavs.length} 个收藏夹需要创建:`, missingFavs.join(', '));
-
-    // 保存状态
-    StateManager.saveState({
-      phase: 'creating',
-      returnURL: window.location.href,
-      tasks: tasks,
-      missingFavs: missingFavs
-    });
-
     // 跳转到自己的收藏夹页面
     const ownURL = PageDetector.getOwnFavListURL();
     if (!ownURL) {
@@ -50,8 +32,15 @@ export class CrossPageFlowManager {
       return;
     }
 
+    // 保存状态（缺失对比延后到自己页面执行）
+    StateManager.saveState({
+      phase: 'creating',
+      returnURL: window.location.href,
+      tasks: tasks
+    });
+
     log('========================================');
-    log('即将跳转到自己的收藏夹页面批量创建收藏夹');
+    log('即将跳转到自己的收藏夹页面对比并创建缺失收藏夹');
     log('完成后将自动返回并继续复制');
     log('跳转倒计时: 3 秒...');
     log('========================================');
@@ -92,11 +81,28 @@ export class CrossPageFlowManager {
   }
 
   /**
-   * 创建单个收藏夹（通过批量模式对话框）
+   * 创建单个收藏夹：优先左侧边栏原生入口，失败回退到复制对话框方式
    * @param {string} favName - 收藏夹名称
    * @returns {Promise<boolean>}
    */
   async createSingleFavorite(favName) {
+    // 优先：左侧边栏原生"新建收藏夹"入口（最简，无需批量模式/复制对话框）
+    if (await BilibiliAPI.createFavoriteViaSidebar(favName)) {
+      log(`✓ 创建收藏夹 [${favName}] 成功（侧边栏入口）`);
+      return true;
+    }
+
+    // 回退：复制对话框内"新建收藏夹"（已验证可用）
+    log('侧边栏入口不可用，回退到复制对话框方式创建');
+    return await this.createViaCopyDialog(favName);
+  }
+
+  /**
+   * 通过批量模式复制对话框创建收藏夹（回退方案，已验证可用）
+   * @param {string} favName - 收藏夹名称
+   * @returns {Promise<boolean>}
+   */
+  async createViaCopyDialog(favName) {
     // 1. 点击第一个收藏夹（确保有内容可操作）
     const allFavs = BilibiliAPI.getAllFavorites();
     if (allFavs.length === 0) {
@@ -108,13 +114,20 @@ export class CrossPageFlowManager {
     await delay(CONFIG.DELAY.MIDDLE);
 
     // 2. 进入批量操作模式
-    const batchSuccess = await BilibiliAPI.clickBatchOperationButton();
+    const batchSuccess = await BilibiliAPI.ensureBatchModeActive();
     if (!batchSuccess) {
       error('无法进入批量模式');
       return false;
     }
 
-    // 3. 点击复制按钮打开对话框
+    // 3. 全选当前页视频（否则"复制至"按钮不可用，对话框不会弹出）
+    if (!BilibiliAPI.clickSelectAll()) {
+      error('无法全选视频，"复制至"将不可用');
+      return false;
+    }
+    await delay(CONFIG.DELAY.SHORT);
+
+    // 4. 点击复制按钮打开对话框
     if (!await BilibiliAPI.clickCopyButton()) {
       return false;
     }
@@ -162,27 +175,39 @@ export class CrossPageFlowManager {
     log('========================================');
 
     if (state.phase === 'creating') {
-      // 在自己页面，执行批量创建
-      const success = await this.batchCreateFavorites(state.missingFavs);
+      // 当前已在「自己页面」，此时 getAllFavoriteNames() = 自己的收藏夹
+      // 在此对比目标名称，找出真正缺失（自己还没有）的收藏夹
+      const ownNames = this.manager.getAllFavoriteNames();
+      const missing = state.tasks
+        .map(t => t.target)
+        .filter((name, index, self) => self.indexOf(name) === index) // 去重
+        .filter(name => !ownNames.includes(name)); // 过滤自己已有的
 
-      if (success) {
-        // 更新状态：准备返回复制
-        StateManager.saveState({
-          ...state,
-          phase: 'copying'
-        });
-
-        log('========================================');
-        log('收藏夹创建完成，返回原页面继续复制');
-        log('跳转倒计时: 3 秒...');
-        log('========================================');
-
-        await delay(3000);
-        window.location.href = state.returnURL;
+      if (missing.length > 0) {
+        log(`检测到 ${missing.length} 个收藏夹需要创建:`, missing.join(', '));
+        const success = await this.batchCreateFavorites(missing);
+        if (!success) {
+          error('收藏夹创建失败，请手动创建后重试');
+          StateManager.clearState();
+          return true;
+        }
       } else {
-        error('收藏夹创建失败，请手动创建后重试');
-        StateManager.clearState();
+        log('所有目标收藏夹均已存在，无需创建');
       }
+
+      // 更新状态：准备返回复制
+      StateManager.saveState({
+        ...state,
+        phase: 'copying'
+      });
+
+      log('========================================');
+      log('收藏夹准备完成，返回原页面继续复制');
+      log('跳转倒计时: 3 秒...');
+      log('========================================');
+
+      await delay(3000);
+      window.location.href = state.returnURL;
 
       return true;
     } else if (state.phase === 'copying') {
@@ -191,11 +216,11 @@ export class CrossPageFlowManager {
       log('已返回原页面，继续复制流程');
       log('========================================');
 
-      // 清除状态
-      StateManager.clearState();
+      // 执行复制（跳过跨页面检测，避免重复触发跳转）
+      await this.manager.batchCopy(state.tasks, { skipCrossPage: true });
 
-      // 自动触发复制流程
-      await this.manager.batchCopy(state.tasks);
+      // 复制完成后清除状态
+      StateManager.clearState();
 
       return true;
     }

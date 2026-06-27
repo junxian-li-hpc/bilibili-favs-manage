@@ -199,21 +199,21 @@ export class FavoriteManager {
   /**
    * 批量复制收藏夹
    * @param {Array<{source: string, target: string}>} copyList - 复制列表
+   * @param {Object} [options] - 选项
+   * @param {boolean} [options.skipCrossPage=false] - 跳过跨页面检测，直接进入复制循环
    * @returns {Promise<void>}
    */
-  async batchCopy(copyList) {
+  async batchCopy(copyList, options = {}) {
+    const { skipCrossPage = false } = options;
     log('开始批量复制，共', copyList.length, '个任务');
 
-    // 检测是否需要跨页面创建收藏夹
-    const isOwnPage = PageDetector.isOwnPage();
-    if (!isOwnPage) {
-      // 在别人页面，检查是否有需要创建的收藏夹
-      const currentFavs = this.getAllFavoriteNames();
-      const needCreate = copyList.some(task => !currentFavs.includes(task.target));
-
-      if (needCreate) {
-        log('检测到在别人页面且需要创建新收藏夹');
-        log('启动跨页面流程...');
+    // 检测是否需要跨页面创建收藏夹（copying 阶段恢复时跳过，避免重复触发跳转）
+    if (!skipCrossPage) {
+      const isOwnPage = PageDetector.isOwnPage();
+      if (!isOwnPage) {
+        // 在别人页面：option A——只要在他人页面就走跨页面流程，
+        // 由「自己页面」阶段再对比并创建缺失的收藏夹
+        log('检测到在别人页面，启动跨页面流程...');
         await this.crossPageFlow.startCrossPageFlow(copyList);
         return; // 跳转后中断当前流程
       }

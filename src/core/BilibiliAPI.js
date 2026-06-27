@@ -44,52 +44,50 @@ export class BilibiliAPI {
       return [];
     }
 
-    // 获取所有收藏夹项
     const allItems = Array.from(sidebar.querySelectorAll(SELECTORS.FAVORITES_ITEM));
-    const favorites = [];
-    let inCreatedSection = false;
-
-    // 遍历侧边栏的所有子元素（包括文本节点）
-    const allChildren = Array.from(sidebar.children);
-
-    for (const child of allChildren) {
-      const text = child.textContent.trim();
-
-      // 检测分组标题（可能是任何元素，通过文本内容判断）
-      if (text === '我创建的收藏夹') {
-        inCreatedSection = true;
-        log('检测到"我创建的收藏夹"分组');
-        continue;
-      }
-
-      if (text === '我追的合集/收藏夹' || text === '其他收藏') {
-        inCreatedSection = false;
-        log(`检测到分隔标记: ${text}，停止收集`);
-        continue;
-      }
-
-      // 如果是收藏夹项，且在"我创建的"分组中，则收集
-      if (inCreatedSection && child.classList.contains('vui_sidebar-item')) {
-        favorites.push(child);
-      }
+    if (allItems.length === 0) {
+      return [];
     }
 
-    // 如果没有找到"我创建的收藏夹"标记，采用降级策略
-    if (!inCreatedSection && favorites.length === 0) {
+    // 在侧边栏内按"精确文本"定位分组标题元素。
+    // 标题不一定是 sidebar 的直接子节点（常嵌套在 wrapper 内），
+    // 因此遍历全部后代，取文本精确匹配且不含收藏夹项的最深元素。
+    const findMarker = (markerText) => {
+      const matches = Array.from(sidebar.querySelectorAll('*')).filter(
+        el => el.textContent.trim() === markerText &&
+              !el.querySelector(SELECTORS.FAVORITES_ITEM)
+      );
+      return matches.length ? matches[matches.length - 1] : null;
+    };
+
+    // b 是否在 a 之后（文档顺序）
+    const follows = (a, b) =>
+      !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    const createdMarker = findMarker('我创建的收藏夹');
+    if (!createdMarker) {
       warn('未找到"我创建的收藏夹"分组标记，使用降级策略');
       warn('将返回所有收藏夹项（包含"我追的合集/收藏夹"）');
-      // 降级：返回所有收藏夹项
       return allItems;
     }
 
-    // 延迟日志：只有在 logger 已初始化时才输出
-    if (typeof log === 'function') {
-      setTimeout(() => {
-        log('过滤结果: 总数', allItems.length, '→ 我创建的', favorites.length);
-      }, 0);
-    }
+    // 结束标记：'我追的合集/收藏夹' 或 '其他收藏' 中，位于 createdMarker 之后且最靠前的一个
+    const endMarker = ['我追的合集/收藏夹', '其他收藏']
+      .map(findMarker)
+      .filter(m => m && follows(createdMarker, m))
+      .sort((a, b) => (follows(a, b) ? -1 : 1))[0] || null;
 
-    return favorites;
+    // 收集位于 createdMarker 与 endMarker 之间的收藏夹项
+    const favorites = allItems.filter(item => {
+      if (!follows(createdMarker, item)) return false;
+      if (endMarker && !follows(item, endMarker)) return false;
+      return true;
+    });
+
+    log('过滤结果: 总数', allItems.length, '→ 我创建的', favorites.length);
+
+    // 兜底：若意外为空，返回全部，避免面板空白
+    return favorites.length > 0 ? favorites : allItems;
   }
 
   /**
@@ -287,6 +285,48 @@ export class BilibiliAPI {
 
     log('点击创建按钮');
     createConfirmBtn.click();
+    await delay(CONFIG.DELAY.MIDDLE);
+    return true;
+  }
+
+  /**
+   * 通过左侧边栏原生"新建收藏夹"入口创建收藏夹
+   * （无需进入批量模式/复制对话框；入口或对话框缺失时返回 false，交由调用方回退）
+   * @param {string} favName - 收藏夹名称
+   * @returns {Promise<boolean>}
+   */
+  static async createFavoriteViaSidebar(favName) {
+    const sidebar = document.querySelector(SELECTORS.FAVORITES_SIDEBAR);
+    if (!sidebar) return false;
+
+    // 文本精确为"新建收藏夹"的叶子元素即入口
+    const entry = Array.from(sidebar.querySelectorAll('*')).find(
+      el => el.children.length === 0 &&
+            el.textContent.trim() === BUTTON_TEXTS.CREATE_NEW
+    );
+    if (!entry) {
+      warn('侧边栏未找到"新建收藏夹"入口');
+      return false;
+    }
+
+    log('点击左侧边栏[新建收藏夹]');
+    const clickable = entry.closest(
+      'button, [role="button"], [class*="add"], [class*="create"], [class*="btn"]'
+    ) || entry;
+    clickable.click();
+    await delay(CONFIG.DELAY.SHORT);
+
+    // 等待名称输入框（复用与复制对话框一致的创建组件）
+    const input = await waitForElement(SELECTORS.CREATE_FAV_NAME_INPUT, 3000);
+    if (!input) {
+      warn('点击"新建收藏夹"后未出现名称输入框');
+      return false;
+    }
+
+    // 输入名称并点击创建
+    if (!await this.inputFavoriteName(favName)) return false;
+    if (!await this.clickCreateButton()) return false;
+
     await delay(CONFIG.DELAY.MIDDLE);
     return true;
   }
