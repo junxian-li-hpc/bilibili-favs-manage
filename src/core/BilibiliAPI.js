@@ -406,4 +406,212 @@ export class BilibiliAPI {
     const favList = this.getFavoriteListInDialog(dialog);
     return favList.some(fav => fav.name === favName);
   }
+
+  // ========== API 直接操作方法 ==========
+
+  /**
+   * 从 Cookie 获取 CSRF Token (bili_jct)
+   * @returns {string|null}
+   */
+  static getCSRFToken() {
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [key, value] = cookie.trim().split('=');
+      if (key === 'bili_jct') {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 从当前页面收集视频 BV 号
+   * @returns {Array<string>} BV 号数组
+   */
+  static collectVideoBvidsFromPage() {
+    const bvids = [];
+    const videoCards = document.querySelectorAll(SELECTORS.VIDEO_CARD);
+
+    for (const card of videoCards) {
+      const links = card.querySelectorAll('a[href*="/video/"]');
+      for (const link of links) {
+        const match = link.href.match(/\/video\/(BV\w+)/);
+        if (match && !bvids.includes(match[1])) {
+          bvids.push(match[1]);
+          break; // 每个卡片只取一个
+        }
+      }
+    }
+
+    return bvids;
+  }
+
+  /**
+   * 通过 API 获取视频的 aid
+   * @param {string} bvid - BV 号
+   * @returns {Promise<number|null>} 视频 aid
+   */
+  static async getVideoAid(bvid) {
+    try {
+      const resp = await fetch(`https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`, {
+        credentials: 'include'
+      });
+      const data = await resp.json();
+      if (data.code === 0 && data.data) {
+        return data.data.aid;
+      }
+      warn(`获取视频 ${bvid} 信息失败:`, data.message);
+      return null;
+    } catch (e) {
+      error(`获取视频 ${bvid} 信息异常:`, e.message);
+      return null;
+    }
+  }
+
+  /**
+   * 批量获取视频 aid
+   * @param {Array<string>} bvids - BV 号数组
+   * @returns {Promise<Array<number>>} aid 数组
+   */
+  static async batchGetVideoAids(bvids) {
+    const aids = [];
+    for (const bvid of bvids) {
+      const aid = await this.getVideoAid(bvid);
+      if (aid !== null) {
+        aids.push(aid);
+      }
+      await delay(200); // 避免请求过快
+    }
+    return aids;
+  }
+
+  /**
+   * 通过 API 获取用户自己的收藏夹列表
+   * @returns {Promise<Array<{id: number, title: string, media_count: number}>>}
+   */
+  static async getOwnFavoritesList() {
+    const cookies = document.cookie.split(';');
+    let mid = null;
+    for (const cookie of cookies) {
+      const [key, value] = cookie.trim().split('=');
+      if (key === 'DedeUserID') {
+        mid = value;
+        break;
+      }
+    }
+
+    if (!mid) {
+      error('无法获取用户 UID');
+      return [];
+    }
+
+    try {
+      const resp = await fetch(
+        `https://api.bilibili.com/x/v3/fav/folder/created/list-all?up_mid=${mid}`,
+        { credentials: 'include' }
+      );
+      const data = await resp.json();
+      if (data.code === 0 && data.data && data.data.list) {
+        return data.data.list;
+      }
+      error('获取收藏夹列表失败:', data.message);
+      return [];
+    } catch (e) {
+      error('获取收藏夹列表异常:', e.message);
+      return [];
+    }
+  }
+
+  /**
+   * 通过 API 创建收藏夹
+   * @param {string} title - 收藏夹名称
+   * @returns {Promise<number|null>} 新建收藏夹的 ID
+   */
+  static async createFavoriteViaAPI(title) {
+    const csrf = this.getCSRFToken();
+    if (!csrf) {
+      error('无法获取 CSRF Token');
+      return null;
+    }
+
+    try {
+      const body = new URLSearchParams({
+        title: title,
+        privacy: '0',  // 0=公开, 1=私密
+        csrf: csrf
+      });
+
+      const resp = await fetch('https://api.bilibili.com/x/v3/fav/folder/add', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: body.toString()
+      });
+
+      const data = await resp.json();
+      if (data.code === 0 && data.data) {
+        log(`✓ 通过 API 创建收藏夹 [${title}] 成功, ID: ${data.data.id}`);
+        return data.data.id;
+      }
+      error(`创建收藏夹 [${title}] 失败:`, data.message);
+      return null;
+    } catch (e) {
+      error(`创建收藏夹 [${title}] 异常:`, e.message);
+      return null;
+    }
+  }
+
+  /**
+   * 通过 API 批量添加视频到收藏夹
+   * @param {Array<number>} aids - 视频 aid 数组
+   * @param {number} targetFavId - 目标收藏夹 ID
+   * @returns {Promise<{success: number, failed: number}>}
+   */
+  static async addVideosToFavorites(aids, targetFavId) {
+    const csrf = this.getCSRFToken();
+    if (!csrf) {
+      error('无法获取 CSRF Token');
+      return { success: 0, failed: aids.length };
+    }
+
+    let success = 0;
+    let failed = 0;
+
+    for (const aid of aids) {
+      try {
+        // B站收藏夹 API: resources 参数格式为 "aid:type"（type=2 表示视频）
+        const body = new URLSearchParams({
+          resources: `${aid}:2`,
+          add_media_ids: targetFavId.toString(),
+          csrf: csrf
+        });
+
+        const resp = await fetch('https://api.bilibili.com/x/v3/fav/resource/deal', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: body.toString()
+        });
+
+        const data = await resp.json();
+        if (data.code === 0) {
+          success++;
+        } else {
+          warn(`添加视频 aid=${aid} 失败:`, data.message);
+          failed++;
+        }
+
+        await delay(300); // 请求间隔
+      } catch (e) {
+        error(`添加视频 aid=${aid} 异常:`, e.message);
+        failed++;
+      }
+    }
+
+    return { success, failed };
+  }
 }

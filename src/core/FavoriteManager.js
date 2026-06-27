@@ -204,22 +204,34 @@ export class FavoriteManager {
   async batchCopy(copyList) {
     log('开始批量复制，共', copyList.length, '个任务');
 
-    // 检测是否需要跨页面创建收藏夹
+    // 在他人页面时，必须走跨页面流程（对话框只显示当前页面的收藏夹，无法选择自己的）
     const isOwnPage = PageDetector.isOwnPage();
     if (!isOwnPage) {
-      // 在别人页面，检查是否有需要创建的收藏夹
-      const currentFavs = this.getAllFavoriteNames();
-      const needCreate = copyList.some(task => !currentFavs.includes(task.target));
+      log('检测到在他人页面，收集视频信息并启动跨页面流程...');
 
-      if (needCreate) {
-        log('检测到在别人页面且需要创建新收藏夹');
-        log('启动跨页面流程...');
-        await this.crossPageFlow.startCrossPageFlow(copyList);
-        return; // 跳转后中断当前流程
+      // 收集当前页面所有视频的 BV 号
+      const bvids = this.api.collectVideoBvidsFromPage();
+      if (bvids.length === 0) {
+        error('当前页面未找到任何视频，无法复制');
+        return;
       }
+      log(`收集到 ${bvids.length} 个视频`);
+
+      // 获取视频 aid
+      log('正在获取视频详细信息...');
+      const aids = await this.api.batchGetVideoAids(bvids);
+      if (aids.length === 0) {
+        error('无法获取视频信息，复制中止');
+        return;
+      }
+      log(`成功获取 ${aids.length} 个视频的 aid`);
+
+      // 保存状态并跳转到自己的页面
+      await this.crossPageFlow.startCrossPageFlow(copyList, aids);
+      return;
     }
 
-    // 正常复制流程
+    // 在自己页面，正常复制流程
     for (let i = 0; i < copyList.length; i++) {
       const { source, target } = copyList[i];
       log(`\n[${i + 1}/${copyList.length}] ${source} → ${target}`);

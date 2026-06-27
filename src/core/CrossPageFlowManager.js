@@ -1,13 +1,17 @@
 /**
  * 跨页面流程管理器
- * 处理跨页面创建收藏夹的完整流程
+ * 处理从他人收藏夹复制视频到自己收藏夹的完整流程
+ *
+ * 流程概述（他人页面 → 自己页面）：
+ *   1. 在他人页面：收集视频 BV 号 → 转换为 aid → 保存状态 → 跳转到自己页面
+ *   2. 在自己页面：创建缺失的收藏夹 → 通过 API 添加视频 → 完成
  */
 
 import { StateManager } from './StateManager.js';
 import { PageDetector } from './PageDetector.js';
 import { BilibiliAPI } from './BilibiliAPI.js';
 import { delay } from '../utils/dom.js';
-import { log, error } from '../utils/logger.js';
+import { log, error, warn } from '../utils/logger.js';
 import { CONFIG } from '../config/config.js';
 
 export class CrossPageFlowManager {
@@ -18,29 +22,17 @@ export class CrossPageFlowManager {
   /**
    * 开始跨页面流程：保存状态并跳转到自己页面
    * @param {Array<{source: string, target: string}>} tasks - 复制任务列表
+   * @param {Array<number>} aids - 从源页面收集的视频 aid 数组
    * @returns {Promise<void>}
    */
-  async startCrossPageFlow(tasks) {
-    // 获取需要创建的收藏夹列表
-    const currentFavs = this.manager.getAllFavoriteNames();
-    const missingFavs = tasks
-      .map(t => t.target)
-      .filter((name, index, self) => self.indexOf(name) === index) // 去重
-      .filter(name => !currentFavs.includes(name)); // 过滤已存在的
-
-    if (missingFavs.length === 0) {
-      log('所有目标收藏夹均已存在，无需跨页面创建');
-      return;
-    }
-
-    log(`检测到 ${missingFavs.length} 个收藏夹需要创建:`, missingFavs.join(', '));
+  async startCrossPageFlow(tasks, aids) {
+    log(`跨页面流程: 保存 ${aids.length} 个视频和 ${tasks.length} 个任务`);
 
     // 保存状态
     StateManager.saveState({
       phase: 'creating',
-      returnURL: window.location.href,
       tasks: tasks,
-      missingFavs: missingFavs
+      aids: aids
     });
 
     // 跳转到自己的收藏夹页面
@@ -51,99 +43,13 @@ export class CrossPageFlowManager {
     }
 
     log('========================================');
-    log('即将跳转到自己的收藏夹页面批量创建收藏夹');
-    log('完成后将自动返回并继续复制');
+    log('即将跳转到自己的收藏夹页面');
+    log('将自动创建缺失的收藏夹并添加视频');
     log('跳转倒计时: 3 秒...');
     log('========================================');
 
     await delay(3000);
     window.location.href = ownURL;
-  }
-
-  /**
-   * 在自己页面批量创建收藏夹
-   * @param {Array<string>} favNames - 收藏夹名称列表
-   * @returns {Promise<boolean>}
-   */
-  async batchCreateFavorites(favNames) {
-    log('========================================');
-    log('开始批量创建收藏夹');
-    log(`共 ${favNames.length} 个: ${favNames.join(', ')}`);
-    log('========================================');
-
-    for (let i = 0; i < favNames.length; i++) {
-      const favName = favNames[i];
-      log(`[${i + 1}/${favNames.length}] 创建收藏夹: ${favName}`);
-
-      const success = await this.createSingleFavorite(favName);
-      if (!success) {
-        error(`创建收藏夹 [${favName}] 失败`);
-        return false;
-      }
-
-      // 创建间隔延迟
-      if (i < favNames.length - 1) {
-        await delay(CONFIG.DELAY.MIDDLE);
-      }
-    }
-
-    log('✓ 批量创建完成!');
-    return true;
-  }
-
-  /**
-   * 创建单个收藏夹（通过批量模式对话框）
-   * @param {string} favName - 收藏夹名称
-   * @returns {Promise<boolean>}
-   */
-  async createSingleFavorite(favName) {
-    // 1. 点击第一个收藏夹（确保有内容可操作）
-    const allFavs = BilibiliAPI.getAllFavorites();
-    if (allFavs.length === 0) {
-      error('找不到任何收藏夹');
-      return false;
-    }
-
-    allFavs[0].click();
-    await delay(CONFIG.DELAY.MIDDLE);
-
-    // 2. 进入批量操作模式
-    const batchSuccess = await BilibiliAPI.clickBatchOperationButton();
-    if (!batchSuccess) {
-      error('无法进入批量模式');
-      return false;
-    }
-
-    // 3. 点击复制按钮打开对话框
-    if (!await BilibiliAPI.clickCopyButton()) {
-      return false;
-    }
-
-    // 4. 等待对话框
-    const dialog = await BilibiliAPI.waitForDialog();
-    if (!dialog) {
-      error('对话框未出现');
-      return false;
-    }
-
-    // 5. 创建新收藏夹
-    const createSuccess = await this.manager.createNewFavorite(dialog, favName);
-    if (!createSuccess) {
-      // 关闭对话框
-      const cancelBtn = dialog.querySelector('button:not(.vui_button--blue)');
-      if (cancelBtn) cancelBtn.click();
-      return false;
-    }
-
-    // 6. 关闭对话框
-    await delay(CONFIG.DELAY.SHORT);
-    const cancelBtn = dialog.querySelector('button:not(.vui_button--blue)');
-    if (cancelBtn) {
-      cancelBtn.click();
-      await delay(CONFIG.DELAY.SHORT);
-    }
-
-    return true;
   }
 
   /**
@@ -153,53 +59,102 @@ export class CrossPageFlowManager {
   async resumeFlow() {
     const state = StateManager.loadState();
     if (!state) {
-      return false; // 没有跨页面状态
+      return false;
     }
 
     log('========================================');
     log('检测到跨页面流程状态');
     log(`阶段: ${state.phase}`);
+    log(`待处理: ${state.tasks?.length || 0} 个任务, ${state.aids?.length || 0} 个视频`);
     log('========================================');
 
     if (state.phase === 'creating') {
-      // 在自己页面，执行批量创建
-      const success = await this.batchCreateFavorites(state.missingFavs);
-
-      if (success) {
-        // 更新状态：准备返回复制
-        StateManager.saveState({
-          ...state,
-          phase: 'copying'
-        });
-
-        log('========================================');
-        log('收藏夹创建完成，返回原页面继续复制');
-        log('跳转倒计时: 3 秒...');
-        log('========================================');
-
-        await delay(3000);
-        window.location.href = state.returnURL;
-      } else {
-        error('收藏夹创建失败，请手动创建后重试');
-        StateManager.clearState();
-      }
-
-      return true;
-    } else if (state.phase === 'copying') {
-      // 回到原页面，继续复制流程
-      log('========================================');
-      log('已返回原页面，继续复制流程');
-      log('========================================');
-
-      // 清除状态
       StateManager.clearState();
-
-      // 自动触发复制流程
-      await this.manager.batchCopy(state.tasks);
-
+      await this.executeOnOwnPage(state);
       return true;
     }
 
     return false;
+  }
+
+  /**
+   * 在自己页面执行：创建收藏夹 + 添加视频
+   * @param {Object} state - 跨页面状态
+   */
+  async executeOnOwnPage(state) {
+    const { tasks, aids } = state;
+
+    if (!aids || aids.length === 0) {
+      error('没有视频数据，无法继续');
+      return;
+    }
+
+    // 1. 获取自己已有的收藏夹列表
+    log('正在获取自己的收藏夹列表...');
+    const ownFavs = await BilibiliAPI.getOwnFavoritesList();
+    log(`自己的收藏夹: ${ownFavs.length} 个`);
+
+    // 2. 收集需要创建的收藏夹名称
+    const ownFavNames = ownFavs.map(f => f.title);
+    const targetNames = [...new Set(tasks.map(t => t.target))];
+    const missingNames = targetNames.filter(name => !ownFavNames.includes(name));
+
+    // 3. 创建缺失的收藏夹
+    const createdFavMap = new Map(); // name → id
+    if (missingNames.length > 0) {
+      log(`需要创建 ${missingNames.length} 个收藏夹: ${missingNames.join(', ')}`);
+
+      for (const name of missingNames) {
+        const favId = await BilibiliAPI.createFavoriteViaAPI(name);
+        if (favId !== null) {
+          createdFavMap.set(name, favId);
+          log(`✓ 创建收藏夹 [${name}] 成功 (ID: ${favId})`);
+        } else {
+          error(`✗ 创建收藏夹 [${name}] 失败`);
+        }
+        await delay(CONFIG.DELAY.MIDDLE);
+      }
+    }
+
+    // 4. 重新获取收藏夹列表（包含新创建的）
+    const updatedFavs = await BilibiliAPI.getOwnFavoritesList();
+    const favNameToId = new Map();
+    for (const fav of updatedFavs) {
+      favNameToId.set(fav.title, fav.id);
+    }
+
+    // 5. 为每个任务添加视频到目标收藏夹
+    let totalSuccess = 0;
+    let totalFailed = 0;
+
+    for (let i = 0; i < tasks.length; i++) {
+      const { source, target } = tasks[i];
+      const targetFavId = favNameToId.get(target);
+
+      if (!targetFavId) {
+        error(`找不到目标收藏夹 [${target}]，跳过`);
+        totalFailed += aids.length;
+        continue;
+      }
+
+      log(`[${i + 1}/${tasks.length}] 添加 ${aids.length} 个视频到 [${target}] (ID: ${targetFavId})`);
+
+      const result = await BilibiliAPI.addVideosToFavorites(aids, targetFavId);
+      totalSuccess += result.success;
+      totalFailed += result.failed;
+
+      log(`  结果: 成功 ${result.success}, 失败 ${result.failed}`);
+
+      if (i < tasks.length - 1) {
+        await delay(CONFIG.DELAY.MIDDLE);
+      }
+    }
+
+    // 6. 输出最终结果
+    log('========================================');
+    log(`跨页面流程完成！`);
+    log(`视频: 成功 ${totalSuccess}, 失败 ${totalFailed}`);
+    log(`收藏夹: 新建 ${createdFavMap.size} 个`);
+    log('========================================');
   }
 }
