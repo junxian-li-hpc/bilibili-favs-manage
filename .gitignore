@@ -1,0 +1,38 @@
+# Claude Code local configuration and memory
+.claude/
+
+# Trellis workflow system - selective ignoring
+.trellis/.backup-*
+.trellis/worktrees/
+.trellis/.template-hashes.json
+.trellis/.runtime/
+.trellis/.cache/
+
+# Trellis research files with potential sensitive content
+.trellis/tasks/archive/**/research/*.png
+.trellis/tasks/archive/**/research/*.jpg
+.trellis/tasks/archive/**/research/*.txt
+.trellis/tasks/archive/**/research/*snapshot*
+
+# Node modules
+node_modules/
+
+# Build outputs
+# dist/
+build/
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
