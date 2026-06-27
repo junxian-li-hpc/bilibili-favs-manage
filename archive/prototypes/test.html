@@ -1,0 +1,35 @@
+<style>
+    #myDiv {
+        width: 200px; /* 设置固定宽度 */
+        height: 200px; /* 设置固定高度 */
+        overflow: auto; /* 当内容溢出时显示滚动条 */
+        border: 1px solid #ccc; /* 可选：添加边框 */
+        padding: 5px; /* 可选：添加内边距 */
+    }
+</style>
+
+<div id="myDiv" contenteditable="true"></div>
+
+<script>
+    // 获取 div 元素
+    const div = document.getElementById('myDiv');
+
+    // 创建一个计数器，用于追踪添加的 span 元素数量
+    let count = 0;
+
+    // 每隔一段时间添加一个新的 span 元素
+    setInterval(function() {
+        // 创建一个新的 span 元素
+        const span = document.createElement('span');
+        span.textContent = 'New span ' + count;
+
+        // 将 span 元素添加到 div 中
+        div.appendChild(span);
+
+        // 添加换行符，以便每个 span 元素占据一行
+        div.appendChild(document.createElement('br'));
+
+        // 增加计数器的值
+        count++;
+    }, 1000); // 每隔一秒添加一个新的 span 元素
+</script>
